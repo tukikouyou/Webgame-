@@ -1,0 +1,1354 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>弹珠领土战争</title>
+<style>
+  :root{ --bg:#070709; --panel:#101014; --line:#2a2a30; }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:#e8e8e8;font-family:Verdana,"Microsoft YaHei",sans-serif;min-height:100vh;}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;
+         padding:10px 18px;border-bottom:1px solid var(--line);flex-wrap:wrap;}
+  header h1{font-size:18px;letter-spacing:2px;font-weight:bold;}
+  header h1 span{color:#888;font-size:12px;letter-spacing:1px;margin-left:10px;}
+  .ctrl{display:flex;gap:8px;flex-wrap:wrap;}
+  button{background:var(--panel);color:#e8e8e8;border:1px solid var(--line);
+         padding:7px 14px;border-radius:6px;font-size:14px;cursor:pointer;font-family:inherit;}
+  button:hover{border-color:#555;}
+  button.active{background:#e8e8e8;color:#111;font-weight:bold;}
+  #wrap{padding:10px;}
+  #cv{display:block;width:100%;max-width:1560px;margin:0 auto;background:#000;border-radius:10px;}
+  footer{max-width:1560px;margin:4px auto 18px;padding:0 14px;color:#888;font-size:12.5px;line-height:1.8;}
+  footer b{color:#ccc;}
+</style>
+</head>
+<body>
+<header>
+  <h1>弹珠领土战争<span>RELEASE · MULTIPLY · SPIN</span></h1>
+  <div class="ctrl">
+    <button id="btnPause">⏸ 暂停</button>
+    <button id="btnReset">↻ 重新开始</button>
+    <button class="sp active" data-s="1">1×</button>
+    <button class="sp" data-s="2">2×</button>
+    <button class="sp" data-s="4">4×</button>
+  </div>
+</header>
+<div id="wrap"><canvas id="cv" width="1600" height="900"></canvas></div>
+<footer>
+  <b>规则:</b>左上弹珠面板不断掉落四色小球;RELEASE 与 MULTIPLY 开局等宽,随时间 RELEASE 渐窄、MULTIPLY 渐宽,
+  3 分钟后稳定为 1:4,SPIN 宽度不变 —— 落入 <b>MULTIPLY</b>:该色弹药 ×2(初始为 1);
+  落入 <b>RELEASE</b>:炮台把累计弹药全部发射出去;落入 <b>SPIN</b>:小球进入右上技能转盘,在圆形节点间弹跳,
+  只能从内圈挡板底部的小口掉进不断旋转的技能圆环——落在哪个扇区就触发哪个技能。
+  <b>八个技能:</b>+n(弹药+n,每触发一次 n 加 1)/ 护盾(10 秒,敌方小球碰到即消失)/ ×4(弹药×4)/
+  偷取(夺走弹药最多对手的一半弹药)/ 炸弹(发射炸弹弹珠,碰到不同颜色区域时大范围爆炸:染色并清除范围内敌方小球与贯穿弹)/
+  贯穿弹(消耗一半弹药,逐格染色每格扣 1 生命,命中炮台造成剩余生命值伤害,撞护盾扣 1 反弹)/
+  回血(生命回满)/ 上限+10(生命上限+10)。
+  转盘上金色 <b>★</b> 小扇区会把小球送入下方<b>终极转盘</b>:+弹珠(面板循环小球+1)/ 上限+50 /
+  盾100(100 点永久护盾,可叠加,被打空才消失)/ ×10(弹药×10)/
+  +1命(阵亡时满血复活并获 20 秒护盾,弹药与场上弹珠清零,可叠加)/
+  核弹(碰到异色区域引爆,缓慢扩散的冲击波吞噬范围内其他颜色的所有小球,但不改变网格颜色)。
+  面板小球为循环制:每色 2 颗起步,落入底部槽位后回到顶部重新下落。
+  战场上弹珠没有寿命限制,会一直滚动;碰到第一个非己方颜色的格子时把它染成己方颜色并随即消失(一珠换一格)。
+  只有把己方领地一路铺到敌方炮台脚下,弹珠才能直接命中炮台造成伤害——炮台 80 血,归零爆炸淘汰,活到最后的颜色获胜。
+</footer>
+<script>
+'use strict';
+/* ============================================================
+   弹珠领土战争 —— 三个功能区:
+   1) 主战场:四角炮台 + 染色格子地面 + 血量淘汰
+   2) 左上弹珠面板:RELEASE / MULTIPLY / SPIN
+   3) 右上技能转盘:旋转缺口,掉出触发技能(弹药×4)
+   ============================================================ */
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const W = 1600, H = 900;
+let SPEED = 1, paused = false;
+
+/* ---------- 可调配置 ---------- */
+const N = 64;                 // 格子数 N×N
+const BS = 700;               // 战场像素尺寸
+const BX = 450, BY = 130;     // 战场左上角
+const CS = BS / N;            // 单格尺寸
+const MAX_HP = 100;            // 炮台血量
+const AMMO_CAP = 1048576;     // 弹药上限(防爆炸)
+const MARBLE_CAP = 20000;       // 每色场上弹珠上限(保性能)
+const PLINKO_INTERVAL = 0.55; // 弹珠面板掉球间隔(秒)
+const MR = 4.5;               // 战场弹珠半径
+const SHIELD_R = 55;          // 护盾半径
+const PR = 10;                // 贯穿弹半径
+const BBR = 9;                // 炸弹弹珠半径
+const BOMB_RC = 9;            // 炸弹爆炸半径(格)
+const NBR = 11;               // 核弹弹珠半径
+const NUKE_R = 400;           // 核弹冲击波最大半径(像素)
+const NUKE_SPEED = 20;        // 冲击波扩散速度(像素/秒)
+
+const TEAMS = [
+  { name:'橙色', ball:'#ff9430', cell:'#e8a45f', corner:[0,0] },
+  { name:'青色', ball:'#17dede', cell:'#63d8d8', corner:[1,0] },
+  { name:'紫色', ball:'#8a3ae0', cell:'#c2a4ef', corner:[0,1] },
+  { name:'粉色', ball:'#ff45d2', cell:'#f3a0e3', corner:[1,1] },
+];
+const NEUTRAL = '#9c9c9c';
+
+/* ---------- 工具 ---------- */
+const rand = (a,b) => a + Math.random()*(b-a);
+function shade(hex, f){
+  const n = parseInt(hex.slice(1),16);
+  let r = n>>16, g = (n>>8)&255, b = n&255;
+  if(f<0){ r*=1+f; g*=1+f; b*=1+f; }
+  else   { r+=(255-r)*f; g+=(255-g)*f; b+=(255-b)*f; }
+  return 'rgb(' + (r|0) + ',' + (g|0) + ',' + (b|0) + ')';
+}
+function fmt(n){
+  n = Math.floor(n);
+  if(n >= 1e6) return (n/1e6).toFixed(1) + 'M';
+  if(n >= 1e4) return Math.round(n/1e3) + 'k';
+  return '' + n;
+}
+function norm(a){ a %= Math.PI*2; if(a < 0) a += Math.PI*2; return a; }
+
+/* ---------- 战场格子(离屏画布,只重绘变化格) ---------- */
+const bc = document.createElement('canvas');
+bc.width = BS; bc.height = BS;
+const bctx = bc.getContext('2d');
+let cells;
+
+function drawCell(i, j, o){
+  bctx.fillStyle = o < 0 ? NEUTRAL : TEAMS[o].cell;
+  bctx.fillRect(i*CS, j*CS, CS, CS);
+  bctx.strokeStyle = 'rgba(0,0,0,0.30)';
+  bctx.lineWidth = 1;
+  bctx.strokeRect(i*CS+0.5, j*CS+0.5, CS-1, CS-1);
+}
+function paintCell(i, j, o){
+  if(i<0 || j<0 || i>=N || j>=N) return;
+  const k = j*N + i;
+  if(cells[k] === o) return;
+  cells[k] = o;
+  drawCell(i, j, o);
+}
+
+/* ---------- 状态 ---------- */
+let cannons, marbles, counts, plinkoBalls, wheelBalls, pierceBalls, bombBalls, nukeBalls, ultraBalls, shockwaves, waves, particles, toasts, flashes, segFlashes, segFlashes2;
+let t, spawnTimer, rrIdx, theta, theta2, pegTheta, plusVal, gameOver, winner, winTimer, confettiT;
+
+function reset(){
+  t=0; spawnTimer=0; rrIdx=0; theta=0; theta2=0; pegTheta=0;
+  plusVal=1; LABELS[0]='+1';
+  gameOver=false; winner=null; winTimer=0; confettiT=0;
+  marbles=[]; plinkoBalls=[]; wheelBalls=[]; pierceBalls=[]; bombBalls=[]; nukeBalls=[]; ultraBalls=[]; shockwaves=[]; waves=[];
+  particles=[]; toasts=[]; flashes=[]; segFlashes=[]; segFlashes2=[];
+  counts=[0,0,0,0];
+  cells = new Int16Array(N*N).fill(-1);
+
+  // 初始领地:四角四分之一圆
+  const R = N*0.40;
+  const cc = TEAMS.map(tm => [tm.corner[0]*(N-1), tm.corner[1]*(N-1)]);
+  for(let j=0;j<N;j++) for(let i=0;i<N;i++){
+    let o = -1;
+    for(let c=0;c<4;c++){
+      const dx=i-cc[c][0], dy=j-cc[c][1];
+      if(dx*dx+dy*dy < R*R){ o=c; break; }
+    }
+    cells[j*N+i] = o;
+    drawCell(i,j,o);
+  }
+  cannons = TEAMS.map((tm, idx) => {
+    const off = Math.round(N*0.11);
+    const ci = tm.corner[0] ? N-1-off : off;
+    const cj = tm.corner[1] ? N-1-off : off;
+    const x = BX + (ci+0.5)*CS, y = BY + (cj+0.5)*CS;
+    return { idx, x, y, hp:MAX_HP, maxHp:MAX_HP, shield:0, shieldHp:0, lives:0, purge:false,
+             ammo:1, queue:10, fireAcc:0, dmgCd:0, alive:true,
+             phase:Math.random()*6.283,
+             base:Math.atan2(BY+BS/2 - y, BX+BS/2 - x), aim:0 };
+  });
+  // 弹珠面板:每色初始 2 颗循环小球
+  for(let i=0;i<4;i++) plinkoBalls.push(newPlinkoBall(i), newPlinkoBall(i));
+}
+
+/* ============================================================
+   功能区 1:主战场
+   ============================================================ */
+function updateCannons(h){
+  for(const c of cannons){
+    if(!c.alive) continue;
+    c.dmgCd -= h;
+    if(c.shield > 0) c.shield = Math.max(0, c.shield - h);
+    c.aim = c.base + Math.sin(t*1.0 + c.phase)*1.0;   // 炮口左右摆动
+    const rate = Math.min(500, 10 + c.queue*0.15);    // 待发越多射速越快
+    c.fireAcc += h*rate;
+    while(c.fireAcc >= 1 && c.queue > 0){
+      c.fireAcc -= 1;
+      if(counts[c.idx] >= MARBLE_CAP) break;
+      c.queue--;
+      fireMarble(c);
+    }
+    if(c.fireAcc > 3) c.fireAcc = 3;
+  }
+}
+function fireMarble(c){
+  const a = c.aim + rand(-0.06, 0.06), sp = rand(180, 330);
+  marbles.push({ x:c.x+Math.cos(a)*30, y:c.y+Math.sin(a)*30,
+                 vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, c:c.idx });
+  counts[c.idx]++;
+}
+function shielded(c){ return c.shield > 0 || c.shieldHp > 0; }
+function hitShield(c){   // 护盾吸收一次攻击:计时盾免费,否则永久盾扣 1 点
+  if(c.shield <= 0 && c.shieldHp > 0) c.shieldHp--;
+}
+function updateMarbles(h){
+  // 复活炮台的"清场"延迟处理(避免循环中过滤被覆盖)
+  for(const c of cannons){
+    if(c.purge){
+      marbles = marbles.filter(m => m.c !== c.idx);
+      counts[c.idx] = 0;
+      c.purge = false;
+    }
+  }
+  const out = [];
+  const damp = Math.pow(0.95, h);   // 轻微阻力,弹珠无寿命限制
+  for(const m of marbles){
+    if(!cannons[m.c].alive) continue;   // 已淘汰颜色的弹珠直接清除
+    m.vx *= damp; m.vy *= damp;
+    const px = m.x, py = m.y;
+    m.x += m.vx*h; m.y += m.vy*h;
+    // 撞墙反弹
+    if(m.x < BX+MR){ m.x = BX+MR; m.vx =  Math.abs(m.vx)*0.85; }
+    else if(m.x > BX+BS-MR){ m.x = BX+BS-MR; m.vx = -Math.abs(m.vx)*0.85; }
+    if(m.y < BY+MR){ m.y = BY+MR; m.vy =  Math.abs(m.vy)*0.85; }
+    else if(m.y > BY+BS-MR){ m.y = BY+BS-MR; m.vy = -Math.abs(m.vy)*0.85; }
+    // 敌方护盾:碰到即消失(永久护盾同时扣 1 点护盾值)
+    let dead = false;
+    for(const cn of cannons){
+      if(cn.alive && shielded(cn) && cn.idx !== m.c){
+        const ax = m.x-cn.x, ay = m.y-cn.y;
+        if(ax*ax+ay*ay < (SHIELD_R+MR)*(SHIELD_R+MR)){
+          dead = true;
+          hitShield(cn);
+          spark(m.x, m.y, TEAMS[m.c].ball);
+          break;
+        }
+      }
+    }
+    // 沿路径检查:碰到第一个非己方格子 → 染色并消失(一珠换一格)
+    if(!dead){
+      const dx = m.x-px, dy = m.y-py;
+      const d = Math.hypot(dx,dy);
+      const steps = Math.max(1, Math.ceil(d/(CS*0.7)));
+      for(let s=1;s<=steps;s++){
+        const xx = px + dx*s/steps, yy = py + dy*s/steps;
+        const ci = ((xx-BX)/CS)|0, cj = ((yy-BY)/CS)|0;
+        if(ci<0 || cj<0 || ci>=N || cj>=N) continue;
+        if(cells[cj*N+ci] !== m.c){
+          paintCell(ci, cj, m.c);
+          spark(xx, yy, TEAMS[m.c].ball);
+          m.x = xx; m.y = yy;
+          dead = true;
+          break;
+        }
+      }
+    }
+    // 撞敌方炮台(领地铺到炮台脚下后,弹珠才能滚到这里)
+    if(!dead){
+      for(const c of cannons){
+        if(!c.alive || c.idx === m.c) continue;
+        const ax = m.x-c.x, ay = m.y-c.y;
+        if(ax*ax+ay*ay < 28*28){
+          dead = true;
+          if(c.dmgCd <= 0){
+            c.dmgCd = 0.03;
+            c.hp--;
+            spark(m.x, m.y, TEAMS[m.c].ball);
+            if(c.hp <= 0) onLethal(c);
+          }
+          break;
+        }
+      }
+    }
+    const sp2 = m.vx*m.vx + m.vy*m.vy;
+    if(dead || sp2 < 25*25){ counts[m.c]--; continue; }  // 速度归零的死珠兜底清理
+    out.push(m);
+  }
+  marbles = out;
+}
+function onLethal(c){
+  if(c.lives > 0){            // 额外生命:复活
+    c.lives--;
+    c.hp = c.maxHp;           // 继承当前生命上限
+    c.ammo = 0; c.queue = 0;  // 弹药与待发清零
+    c.purge = true;           // 场上己方弹珠延迟清除
+    c.shield = Math.max(c.shield, 20);   // 复活附带 20 秒护盾
+    explosion(c.x, c.y, '#ffffff', 80, 420);
+    toast('🔁 ' + TEAMS[c.idx].name + ' 消耗一条生命复活!(剩余 ' + c.lives + ' 条)', TEAMS[c.idx].ball);
+  } else {
+    eliminate(c);
+  }
+}
+function eliminate(c){
+  c.alive = false;
+  explosion(c.x, c.y, TEAMS[c.idx].ball);
+  toast('💥 ' + TEAMS[c.idx].name + '炮台被摧毁!', TEAMS[c.idx].ball);
+  plinkoBalls = plinkoBalls.filter(b => b.c !== c.idx);
+  wheelBalls  = wheelBalls.filter(b => b.c !== c.idx);
+  marbles = marbles.filter(m => m.c !== c.idx);
+  pierceBalls = pierceBalls.filter(p => p.c !== c.idx);
+  bombBalls = bombBalls.filter(b => b.c !== c.idx);
+  nukeBalls = nukeBalls.filter(b => b.c !== c.idx);
+  ultraBalls = ultraBalls.filter(b => b.c !== c.idx);
+  shockwaves = shockwaves.filter(w => w.c !== c.idx);
+  counts[c.idx] = 0;
+}
+function checkWin(h){
+  if(gameOver) return;
+  const alive = cannons.filter(c => c.alive);
+  if(alive.length <= 1){
+    winTimer += h;
+    if(winTimer > 1.0){ gameOver = true; winner = alive[0] || null; }
+  } else winTimer = 0;
+}
+
+/* ============================================================
+   功能区 2:左上弹珠面板  RELEASE / MULTIPLY / SPIN
+   ============================================================ */
+const PX=14, PY=14, PW=336, PH=690, SLOT_H=46, PBR=7;
+const SLOT_RAMP = 360;   // RELEASE→MULTIPLY 宽度过渡所需秒数
+// 槽位边界:开局 RELEASE/MULTIPLY 各 0.40,随时间过渡到 0.13/0.67(=1:5),SPIN 固定 0.20
+function slotBounds(){
+  const k = Math.min(1, t/SLOT_RAMP);
+  const rel = 0.40 + (0.13 - 0.40)*k;
+  return [rel, 0.80];
+}
+const pegs = [];
+(function(){
+  for(let r=0;r<12;r++){
+    const y = PY + 78 + r*44;
+    for(let x = PX + 26 + (r%2)*20; x < PX+PW-16; x += 40) pegs.push({x,y});
+  }
+})();
+
+function newPlinkoBall(c){
+  return { x:rand(PX+24, PX+PW-24), y:PY+26, vx:rand(-90,90), vy:0, c };
+}
+function respawnPlinko(b){
+  b.x = rand(PX+24, PX+PW-24); b.y = PY+26;
+  b.vx = rand(-90,90); b.vy = 0;
+}
+function updatePlinko(h){
+  const out = [];
+  for(const b of plinkoBalls){
+    if(!cannons[b.c].alive) continue;   // 已淘汰颜色的小球移除
+    b.vy += 1050*h;
+    b.x += b.vx*h; b.y += b.vy*h;
+    if(b.x < PX+PBR){ b.x = PX+PBR; b.vx =  Math.abs(b.vx)*0.8; }
+    if(b.x > PX+PW-PBR){ b.x = PX+PW-PBR; b.vx = -Math.abs(b.vx)*0.8; }
+    if(b.y < PY+PBR){ b.y = PY+PBR; b.vy =  Math.abs(b.vy)*0.8; }
+    for(const p of pegs){
+      const dx=b.x-p.x, dy=b.y-p.y, rr=PBR+4, d2=dx*dx+dy*dy;
+      if(d2 < rr*rr && d2 > 0.0001){
+        const d = Math.sqrt(d2), nx = dx/d, ny = dy/d;
+        b.x = p.x + nx*rr; b.y = p.y + ny*rr;
+        const dot = b.vx*nx + b.vy*ny;
+        if(dot < 0){ b.vx -= 1.75*dot*nx; b.vy -= 1.75*dot*ny; }
+        b.vx += rand(-25,25);
+      }
+    }
+    if(b.y > PY+PH-SLOT_H-PBR){
+      const f = (b.x-PX)/PW;
+      const bd = slotBounds();
+      slotEffect(b.c, f < bd[0] ? 0 : f < bd[1] ? 1 : 2);
+      respawnPlinko(b);                 // 回到顶部重新下落(小球循环使用)
+    }
+    out.push(b);
+  }
+  plinkoBalls = out;
+}
+function slotEffect(ci, slot){
+  const c = cannons[ci];
+  if(!c || !c.alive) return;
+  const tm = TEAMS[ci];
+  if(slot === 1){                                   // MULTIPLY:弹药×2
+    c.ammo = Math.min(AMMO_CAP, c.ammo*2);
+    toast(tm.name + ' 弹药 ×2 → ' + fmt(c.ammo), tm.ball);
+    flash(1);
+  } else if(slot === 0){                            // RELEASE:全部发射
+    const n = c.ammo;
+    c.queue += n; c.ammo = 1;
+    toast(tm.name + ' 发射 ' + fmt(n) + ' 发!', tm.ball);
+    flash(0);
+  } else {                                          // SPIN:进入技能转盘
+    wheelBalls.push({ x:WX+rand(-30,30), y:WY-IR*0.6,
+                      vx:rand(-60,60), vy:0, c:ci, inRing:false });
+    toast(tm.name + ' 进入转盘!', tm.ball);
+    flash(2);
+  }
+}
+function flash(slot){ flashes.push({slot, t:0.35}); }
+
+/* ============================================================
+   功能区 3:右上技能转盘
+   结构:内圈弹跳区(带圆形节点)→ 固定内圈挡板(只留底部小口)
+        → 旋转的技能圆环,小球落入哪个扇区就触发哪个技能
+   ============================================================ */
+const WX=1408, WY=205, WR=150, IR=106, SEG=Math.PI*2/8;
+const GAP_HALF = 0.30;   // 内圈挡板底部缺口的半宽(弧度)
+const STAR_SEG_START = 0.16;   // ★ 初始大小
+const STAR_SEG_END   = 0.35;   // ★ 最终大小
+const STAR_SEG_RAMP  = 360;    // 变宽所需时间，单位秒，和 SLOT_RAMP 一样
+
+function smallSeg(){
+  const k = Math.min(1, t / STAR_SEG_RAMP);
+  return STAR_SEG_START + (STAR_SEG_END - STAR_SEG_START) * k;
+}
+
+function bigSeg(){
+  return (Math.PI * 2 - smallSeg()) / 8;// 8 个常规技能扇区
+}
+// ---- 终极技能转盘(下方,结构与上方相同)----
+const WX2 = WX, WY2 = 570, SEG2 = Math.PI*2/6;
+const ULT_LABELS = ['+弹珠','上限+50','盾100','×10','+1命','核弹'];
+const LABELS = ['+1','护盾','×4','偷取','炸弹','贯穿','回血','上限+10'];
+const PEG_OMEGA = -0.9;   // 内圈节点旋转角速度(与技能环反向,搅动小球)
+const wheelPegs = [];
+(function(){
+  wheelPegs.push({r:8, a:-Math.PI/2});
+  // 内圈：5 个
+  for(let i=0;i<5;i++){
+    wheelPegs.push({r:30,a:i*Math.PI*2/5 + Math.PI/2});
+  }
+  // 中圈：9 个
+  for(let i=0;i<9;i++){
+    wheelPegs.push({r:58,a:i*Math.PI*2/9 + Math.PI/9});
+  }
+  // 外圈：12 个
+  for(let i=0;i<12;i++){
+    wheelPegs.push({r:84,a:i*Math.PI*2/12});
+  }
+})();
+function pegPos(p, cx, cy){
+  const a = p.a + pegTheta;
+  return [cx + Math.cos(a)*p.r, cy + Math.sin(a)*p.r];
+}
+
+function updateWheel(h){
+  theta += h*0.55;
+  pegTheta += h*PEG_OMEGA;
+  for(const f of segFlashes) f.t -= h;
+  segFlashes = segFlashes.filter(f => f.t > 0);
+  const out = [];
+  for(const b of wheelBalls){
+    b.vy += 1000*h;
+    b.x += b.vx*h; b.y += b.vy*h;
+    // 旋转的圆形节点反弹
+    for(const p of wheelPegs){
+      const pp = pegPos(p, WX, WY), px = pp[0], py = pp[1];
+      const dx=b.x-px, dy=b.y-py, rr=PBR+5, d2=dx*dx+dy*dy;
+      if(d2 < rr*rr && d2 > 0.0001){
+        const d=Math.sqrt(d2), nx=dx/d, ny=dy/d;
+        b.x=px+nx*rr; b.y=py+ny*rr;
+        const dot=b.vx*nx+b.vy*ny;
+        if(dot<0){ b.vx-=1.75*dot*nx; b.vy-=1.75*dot*ny; }
+        // 节点本身在转,把表面线速度传给小球(搅动效果)
+        b.vx += -PEG_OMEGA*(py-WY)*0.6 + rand(-20,20);
+        b.vy +=  PEG_OMEGA*(px-WX)*0.6;
+      }
+    }
+    const dx=b.x-WX, dy=b.y-WY, r=Math.hypot(dx,dy);
+    if(!b.inRing){
+      // 内圈挡板:只有底部小口放行
+      if(r+PBR > IR){
+        const ang = norm(Math.atan2(dy,dx));
+        const inGap = Math.abs(ang - Math.PI/2) < GAP_HALF;
+        if(inGap){
+          if(r-PBR > IR) b.inRing = true;   // 穿过小口,进入技能圆环
+        } else {
+          const nx=dx/r, ny=dy/r;
+          b.x = WX + nx*(IR-PBR); b.y = WY + ny*(IR-PBR);
+          const dot = b.vx*nx + b.vy*ny;
+          if(dot > 0){ b.vx -= 1.72*dot*nx; b.vy -= 1.72*dot*ny; }
+          b.vx *= 0.995; b.vy *= 0.995;
+        }
+      }
+    } else {
+      // 已在技能圆环内:碰到外缘 → 触发所在扇区技能
+      if(r+PBR >= WR-2){
+        triggerSkill(b, Math.atan2(dy,dx));
+        continue;
+      }
+      // 不让球从环里弹回内圈
+      if(r-PBR < IR){
+        const nx=dx/r, ny=dy/r;
+        b.x = WX + nx*(IR+PBR); b.y = WY + ny*(IR+PBR);
+        const dot = b.vx*nx + b.vy*ny;
+        if(dot < 0){ b.vx -= 1.6*dot*nx; b.vy -= 1.6*dot*ny; }
+      }
+    }
+    out.push(b);
+  }
+  wheelBalls = out;
+}
+function triggerSkill(b, ang){
+  const rel = norm(ang - theta);
+  const bs = bigSeg();
+  if(rel >= 8*bs){                  // ★ 小扇区:小球进入下方终极转盘
+    segFlashes.push({ s:8, t:0.8, col:TEAMS[b.c].ball });
+    enterUltimate(b);
+    return;
+  }
+  const s = Math.min(7, Math.floor(rel/bs));    // 落点所在扇区
+  const c = cannons[b.c];
+  const tm = TEAMS[b.c];
+  segFlashes.push({ s, t:0.8, col:tm.ball });
+  explosion(b.x, b.y, tm.ball, 18, 160);
+  if(!c || !c.alive) return;
+  switch(s){
+    case 0: {  // +n:数值逐次增长
+      c.ammo = Math.min(AMMO_CAP, c.ammo + plusVal);
+      toast('✨ ' + tm.name + ' 弹药 +' + plusVal + ' → ' + fmt(c.ammo), tm.ball);
+      plusVal++;
+      LABELS[0] = '+' + plusVal;
+      break;
+    }
+    case 1: {  // 护盾:10 秒
+      c.shield = 10;
+      toast('🛡 ' + tm.name + ' 展开护盾 10 秒!', tm.ball);
+      break;
+    }
+    case 2: {  // ×4
+      c.ammo = Math.min(AMMO_CAP, c.ammo*4);
+      toast('✨ ' + tm.name + ' 弹药 ×4 → ' + fmt(c.ammo), tm.ball);
+      break;
+    }
+    case 3: {  // 偷取:夺走弹药最多的对手一半弹药
+      let victim = null;
+      for(const o of cannons){
+        if(!o.alive || o.idx === c.idx) continue;
+        if(!victim || o.ammo > victim.ammo) victim = o;
+      }
+      if(victim && victim.ammo > 1){
+        const n = Math.floor(victim.ammo/2);
+        victim.ammo -= n;
+        c.ammo = Math.min(AMMO_CAP, c.ammo + n);
+        toast('🕳 ' + tm.name + ' 偷走 ' + TEAMS[victim.idx].name + ' ' + fmt(n) + ' 弹药!', tm.ball);
+      } else {
+        toast(tm.name + ' 偷取落空:对手没有可偷的弹药', tm.ball);
+      }
+      break;
+    }
+    case 4:    // 炸弹:发射炸弹弹珠,碰到不同颜色区域时爆炸
+      fireBomb(c);
+      break;
+    case 5: {  // 贯穿弹:消耗一半弹药,生命值 = 消耗量
+      const n = Math.floor(c.ammo/2);
+      if(n < 1){ toast(tm.name + ' 弹药不足,贯穿弹未能发射', tm.ball); break; }
+      c.ammo -= n;
+      const a = c.aim;
+      pierceBalls.push({ x:c.x+Math.cos(a)*36, y:c.y+Math.sin(a)*36,
+                         vx:Math.cos(a)*140, vy:Math.sin(a)*140, c:c.idx, hp:n });
+      toast('💠 ' + tm.name + ' 发射贯穿弹 (HP ' + fmt(n) + ')!', tm.ball);
+      break;
+    }
+    case 6:    // 回血
+      c.hp = c.maxHp;
+      toast('💚 ' + tm.name + ' 生命回满 (' + c.maxHp + ')!', tm.ball);
+      break;
+    case 7:    // 生命上限+10
+      c.maxHp += 10;
+      toast('❤ ' + tm.name + ' 生命上限 +10 → ' + c.maxHp, tm.ball);
+      break;
+  }
+}
+
+/* ---------- 终极技能转盘 ---------- */
+function enterUltimate(b){
+  ultraBalls.push({ x:WX2+rand(-30,30), y:WY2-IR*0.6,
+                    vx:rand(-60,60), vy:0, c:b.c, inRing:false });
+  toast('🌟 ' + TEAMS[b.c].name + ' 进入终极转盘!', TEAMS[b.c].ball);
+}
+function updateUltimate(h){
+  theta2 += h*0.90;
+  for(const fl of segFlashes2) fl.t -= h;
+  segFlashes2 = segFlashes2.filter(fl => fl.t > 0);
+  const out = [];
+  for(const b of ultraBalls){
+    if(!cannons[b.c].alive) continue;
+    b.vy += 1000*h;
+    b.x += b.vx*h; b.y += b.vy*h;
+    for(const p of wheelPegs){
+      const pp = pegPos(p, WX2, WY2), px = pp[0], py = pp[1];
+      const dx=b.x-px, dy=b.y-py, rr=PBR+5, d2=dx*dx+dy*dy;
+      if(d2 < rr*rr && d2 > 0.0001){
+        const d=Math.sqrt(d2), nx=dx/d, ny=dy/d;
+        b.x=px+nx*rr; b.y=py+ny*rr;
+        const dot=b.vx*nx+b.vy*ny;
+        if(dot<0){ b.vx-=1.75*dot*nx; b.vy-=1.75*dot*ny; }
+        b.vx += -PEG_OMEGA*(py-WY2)*0.6 + rand(-20,20);
+        b.vy +=  PEG_OMEGA*(px-WX2)*0.6;
+      }
+    }
+    const dx=b.x-WX2, dy=b.y-WY2, r=Math.hypot(dx,dy);
+    if(!b.inRing){
+      if(r+PBR > IR){
+        const ang = norm(Math.atan2(dy,dx));
+        const inGap = Math.abs(ang - Math.PI/2) < GAP_HALF;
+        if(inGap){
+          if(r-PBR > IR) b.inRing = true;
+        } else {
+          const nx=dx/r, ny=dy/r;
+          b.x = WX2 + nx*(IR-PBR); b.y = WY2 + ny*(IR-PBR);
+          const dot = b.vx*nx + b.vy*ny;
+          if(dot > 0){ b.vx -= 1.72*dot*nx; b.vy -= 1.72*dot*ny; }
+          b.vx *= 0.995; b.vy *= 0.995;
+        }
+      }
+    } else {
+      if(r+PBR >= WR-2){
+        ultimateSkill(b, Math.atan2(dy,dx));
+        continue;
+      }
+      if(r-PBR < IR){
+        const nx=dx/r, ny=dy/r;
+        b.x = WX2 + nx*(IR+PBR); b.y = WY2 + ny*(IR+PBR);
+        const dot = b.vx*nx + b.vy*ny;
+        if(dot < 0){ b.vx -= 1.6*dot*nx; b.vy -= 1.6*dot*ny; }
+      }
+    }
+    out.push(b);
+  }
+  ultraBalls = out;
+}
+function ultimateSkill(b, ang){
+  const s = Math.floor(norm(ang - theta2)/SEG2) % 6;
+  const c = cannons[b.c];
+  const tm = TEAMS[b.c];
+  segFlashes2.push({ s, t:0.8, col:tm.ball });
+  explosion(b.x, b.y, tm.ball, 24, 200);
+  if(!c || !c.alive) return;
+  switch(s){
+    case 0:    // 子弹功能区 +1 循环弹珠
+      plinkoBalls.push(newPlinkoBall(c.idx));
+      toast('🌟 ' + tm.name + ' 面板弹珠 +1!', tm.ball);
+      break;
+    case 1:    // 生命上限 +50
+      c.maxHp += 50;
+      toast('🌟 ' + tm.name + ' 生命上限 +50 → ' + c.maxHp, tm.ball);
+      break;
+    case 2:    // 100 HP 永久护盾(可叠加)
+      c.shieldHp += 100;
+      toast('🌟 ' + tm.name + ' 永久护盾 +100(共 ' + c.shieldHp + ')', tm.ball);
+      break;
+    case 3:    // 弹药 ×10
+      c.ammo = Math.min(AMMO_CAP, c.ammo*10);
+      toast('🌟 ' + tm.name + ' 弹药 ×10 → ' + fmt(c.ammo), tm.ball);
+      break;
+    case 4:    // 额外生命
+      c.lives++;
+      toast('🌟 ' + tm.name + ' 获得额外生命(共 ' + c.lives + ' 条)!', tm.ball);
+      break;
+    case 5:    // 核弹
+      fireNuke(c);
+      break;
+  }
+}
+
+/* ---------- 技能:炸弹弹珠 ---------- */
+function fireBomb(c){
+  const a = c.aim;
+  bombBalls.push({ x:c.x+Math.cos(a)*36, y:c.y+Math.sin(a)*36,
+                   vx:Math.cos(a)*160, vy:Math.sin(a)*160, c:c.idx, dead:false });
+  toast('💣 ' + TEAMS[c.idx].name + ' 发射炸弹弹珠!', TEAMS[c.idx].ball);
+}
+function updateBombs(h){
+  const out = [];
+  for(const b of bombBalls){
+    if(b.dead || !cannons[b.c].alive) continue;
+    const px0 = b.x, py0 = b.y;
+    b.x += b.vx*h; b.y += b.vy*h;
+    // 撞墙反弹(不减速)
+    if(b.x < BX+BBR){ b.x = BX+BBR; b.vx =  Math.abs(b.vx); }
+    else if(b.x > BX+BS-BBR){ b.x = BX+BS-BBR; b.vx = -Math.abs(b.vx); }
+    if(b.y < BY+BBR){ b.y = BY+BBR; b.vy =  Math.abs(b.vy); }
+    else if(b.y > BY+BS-BBR){ b.y = BY+BS-BBR; b.vy = -Math.abs(b.vy); }
+    // 沿路径检测:碰到第一个非己方颜色的格子 → 就地爆炸
+    let boom = false;
+    const dx = b.x-px0, dy = b.y-py0, d = Math.hypot(dx,dy);
+    const steps = Math.max(1, Math.ceil(d/(CS*0.7)));
+    for(let s=1;s<=steps;s++){
+      const xx = px0 + dx*s/steps, yy = py0 + dy*s/steps;
+      const ci = ((xx-BX)/CS)|0, cj = ((yy-BY)/CS)|0;
+      if(ci<0 || cj<0 || ci>=N || cj>=N) continue;
+      if(cells[cj*N+ci] !== b.c){
+        bombAt(b.c, ci, cj);
+        boom = true;
+        break;
+      }
+    }
+    if(boom || b.dead) continue;
+    out.push(b);
+  }
+  bombBalls = out;
+}
+function bombAt(ci, tx, ty){
+  const bx = BX+(tx+0.5)*CS, by = BY+(ty+0.5)*CS;
+  const rc = BOMB_RC, R = CS*rc;
+  // 波及区域全部染色
+  for(let j=Math.max(0,ty-rc); j<=Math.min(N-1,ty+rc); j++)
+    for(let i=Math.max(0,tx-rc); i<=Math.min(N-1,tx+rc); i++){
+      const dx=i-tx, dy=j-ty;
+      if(dx*dx+dy*dy <= rc*rc) paintCell(i, j, ci);
+    }
+  // 波及范围内其他颜色弹珠全部消失
+  marbles = marbles.filter(m => {
+    if(m.c !== ci){
+      const dx=m.x-bx, dy=m.y-by;
+      if(dx*dx+dy*dy < R*R){ counts[m.c]--; return false; }
+    }
+    return true;
+  });
+  // 贯穿弹被波及时无视生命直接消失
+  pierceBalls = pierceBalls.filter(p => {
+    if(p.c !== ci){
+      const dx=p.x-bx, dy=p.y-by;
+      if(dx*dx+dy*dy < R*R) return false;
+    }
+    return true;
+  });
+  // 其他颜色的炸弹/核弹弹珠也会被殉爆清除(打标记,循环外统一移除)
+  for(const ob of bombBalls){
+    if(ob.c !== ci && !ob.dead){
+      const dx=ob.x-bx, dy=ob.y-by;
+      if(dx*dx+dy*dy < R*R) ob.dead = true;
+    }
+  }
+  for(const ob of nukeBalls){
+    if(ob.c !== ci && !ob.dead){
+      const dx=ob.x-bx, dy=ob.y-by;
+      if(dx*dx+dy*dy < R*R) ob.dead = true;
+    }
+  }
+  explosion(bx, by, TEAMS[ci].ball, 110, 520);
+  waves.push({ x:bx, y:by, r:0, max:R+30, col:TEAMS[ci].ball });
+  toast('💣 ' + TEAMS[ci].name + ' 炸弹爆炸!', TEAMS[ci].ball);
+}
+
+/* ---------- 终极技能:核弹 ---------- */
+function fireNuke(c){
+  const a = c.aim;
+  nukeBalls.push({ x:c.x+Math.cos(a)*36, y:c.y+Math.sin(a)*36,
+                   vx:Math.cos(a)*160, vy:Math.sin(a)*160, c:c.idx, dead:false });
+  toast('☢ ' + TEAMS[c.idx].name + ' 发射核弹!', TEAMS[c.idx].ball);
+}
+function updateNukes(h){
+  const out = [];
+  for(const b of nukeBalls){
+    if(b.dead || !cannons[b.c].alive) continue;
+    const px0 = b.x, py0 = b.y;
+    b.x += b.vx*h; b.y += b.vy*h;
+    if(b.x < BX+NBR){ b.x = BX+NBR; b.vx =  Math.abs(b.vx); }
+    else if(b.x > BX+BS-NBR){ b.x = BX+BS-NBR; b.vx = -Math.abs(b.vx); }
+    if(b.y < BY+NBR){ b.y = BY+NBR; b.vy =  Math.abs(b.vy); }
+    else if(b.y > BY+BS-NBR){ b.y = BY+BS-NBR; b.vy = -Math.abs(b.vy); }
+    // 碰到第一个非己方颜色的格子 → 引爆冲击波(不染色)
+    let boom = false;
+    const dx = b.x-px0, dy = b.y-py0, d = Math.hypot(dx,dy);
+    const steps = Math.max(1, Math.ceil(d/(CS*0.7)));
+    for(let st=1;st<=steps;st++){
+      const xx = px0 + dx*st/steps, yy = py0 + dy*st/steps;
+      const ci = ((xx-BX)/CS)|0, cj = ((yy-BY)/CS)|0;
+      if(ci<0 || cj<0 || ci>=N || cj>=N) continue;
+      if(cells[cj*N+ci] !== b.c){
+        shockwaves.push({ x:xx, y:yy, r:0, c:b.c });
+        explosion(xx, yy, '#ffffff', 80, 420);
+        toast('☢ ' + TEAMS[b.c].name + ' 核弹引爆!', TEAMS[b.c].ball);
+        boom = true;
+        break;
+      }
+    }
+    if(boom || b.dead) continue;
+    out.push(b);
+  }
+  nukeBalls = out;
+}
+function updateShockwaves(h){
+  const out = [];
+  for(const w of shockwaves){
+    w.r += NUKE_SPEED*h;
+    const r2 = w.r*w.r;
+    // 冲击波吞噬其他颜色的小球(网格颜色不变)
+    marbles = marbles.filter(m => {
+      if(m.c !== w.c){
+        const dx=m.x-w.x, dy=m.y-w.y;
+        if(dx*dx+dy*dy < r2){ counts[m.c]--; return false; }
+      }
+      return true;
+    });
+    pierceBalls = pierceBalls.filter(p => {
+      if(p.c !== w.c){
+        const dx=p.x-w.x, dy=p.y-w.y;
+        if(dx*dx+dy*dy < r2) return false;
+      }
+      return true;
+    });
+    for(const ob of bombBalls){
+      if(ob.c !== w.c && !ob.dead){
+        const dx=ob.x-w.x, dy=ob.y-w.y;
+        if(dx*dx+dy*dy < r2) ob.dead = true;
+      }
+    }
+    for(const ob of nukeBalls){
+      if(ob.c !== w.c && !ob.dead){
+        const dx=ob.x-w.x, dy=ob.y-w.y;
+        if(dx*dx+dy*dy < r2) ob.dead = true;
+      }
+    }
+    if(w.r < NUKE_R) out.push(w);
+  }
+  shockwaves = out;
+}
+
+/* ---------- 技能:贯穿弹 ---------- */
+function updatePierce(h){
+  const out = [];
+  for(const p of pierceBalls){
+    if(!cannons[p.c].alive) continue;   // 已淘汰颜色的贯穿弹直接清除
+    const px0 = p.x, py0 = p.y;
+    p.x += p.vx*h; p.y += p.vy*h;
+    // 撞墙反弹(不减速)
+    if(p.x < BX+PR){ p.x = BX+PR; p.vx =  Math.abs(p.vx); }
+    else if(p.x > BX+BS-PR){ p.x = BX+BS-PR; p.vx = -Math.abs(p.vx); }
+    if(p.y < BY+PR){ p.y = BY+PR; p.vy =  Math.abs(p.vy); }
+    else if(p.y > BY+BS-PR){ p.y = BY+BS-PR; p.vy = -Math.abs(p.vy); }
+    let dead = false;
+    // 敌方护盾:生命-1 并反弹
+    for(const cn of cannons){
+      if(cn.alive && shielded(cn) && cn.idx !== p.c){
+        const dx=p.x-cn.x, dy=p.y-cn.y, d2=dx*dx+dy*dy, rr=SHIELD_R+PR;
+        if(d2 < rr*rr && d2 > 0.0001){
+          const d=Math.sqrt(d2), nx=dx/d, ny=dy/d;
+          p.x = cn.x+nx*rr; p.y = cn.y+ny*rr;
+          const dot = p.vx*nx + p.vy*ny;
+          if(dot < 0){ p.vx -= 2*dot*nx; p.vy -= 2*dot*ny; }
+          p.hp--;
+          hitShield(cn);
+          spark(p.x, p.y, TEAMS[p.c].ball);
+          if(p.hp <= 0) dead = true;
+        }
+      }
+    }
+    // 敌方炮台:造成剩余生命值的伤害后消失
+    if(!dead){
+      for(const cn of cannons){
+        if(!cn.alive || cn.idx === p.c || shielded(cn)) continue;
+        const dx=p.x-cn.x, dy=p.y-cn.y;
+        if(dx*dx+dy*dy < (28+PR)*(28+PR)){
+          cn.hp -= p.hp;
+          explosion(p.x, p.y, TEAMS[p.c].ball, 40, 300);
+          toast('💥 贯穿弹命中 ' + TEAMS[cn.idx].name + ' (-' + fmt(p.hp) + ' HP)', TEAMS[p.c].ball);
+          if(cn.hp <= 0) onLethal(cn);
+          dead = true;
+          break;
+        }
+      }
+    }
+    // 沿路径啃格子:每染一格生命-1
+    if(!dead){
+      const dx=p.x-px0, dy=p.y-py0, d=Math.hypot(dx,dy);
+      const steps = Math.max(1, Math.ceil(d/(CS*0.7)));
+      for(let s=1;s<=steps;s++){
+        const xx = px0 + dx*s/steps, yy = py0 + dy*s/steps;
+        const ci = ((xx-BX)/CS)|0, cj = ((yy-BY)/CS)|0;
+        if(ci<0 || cj<0 || ci>=N || cj>=N) continue;
+        if(cells[cj*N+ci] !== p.c){
+          paintCell(ci, cj, p.c);
+          p.hp--;
+          if(p.hp <= 0){
+            p.x = xx; p.y = yy;
+            spark(xx, yy, TEAMS[p.c].ball);
+            dead = true;
+            break;
+          }
+        }
+      }
+    }
+    if(dead) continue;
+    out.push(p);
+  }
+  pierceBalls = out;
+}
+
+/* ---------- 冲击波视觉 ---------- */
+function updateWaves(h){
+  for(const w of waves) w.r += 900*h;
+  waves = waves.filter(w => w.r < w.max);
+}
+
+/* ---------- 粒子 / 提示 ---------- */
+function explosion(x, y, col, n, sp){
+  n = n || 70; sp = sp || 420;
+  for(let i=0;i<n;i++){
+    const a = Math.random()*6.283, s = rand(40, sp);
+    particles.push({ x, y, vx:Math.cos(a)*s, vy:Math.sin(a)*s,
+                     life:rand(0.4,1.1), max:1.1, col, sz:rand(2,5) });
+  }
+}
+function spark(x, y, col){
+  if(particles.length < 1400)
+    particles.push({ x, y, vx:rand(-120,120), vy:rand(-120,120),
+                     life:0.3, max:0.3, col, sz:2 });
+}
+function updateParticles(h){
+  const out = [];
+  for(const p of particles){
+    p.life -= h;
+    if(p.life <= 0) continue;
+    p.x += p.vx*h; p.y += p.vy*h;
+    p.vx *= 0.98; p.vy *= 0.98;
+    out.push(p);
+  }
+  particles = out;
+}
+function toast(text, col){
+  toasts.push({text, col, t:2.4});
+  if(toasts.length > 5) toasts.shift();
+}
+function updateToasts(h){
+  for(const o of toasts) o.t -= h;
+  toasts = toasts.filter(o => o.t > 0);
+  for(const f of flashes) f.t -= h;
+  flashes = flashes.filter(f => f.t > 0);
+}
+
+/* ============================================================
+   渲染
+   ============================================================ */
+function render(){
+  ctx.fillStyle = '#070709';
+  ctx.fillRect(0,0,W,H);
+  // 战场底框 + 格子
+  ctx.fillStyle = '#1a1a1d';
+  ctx.fillRect(BX-14, BY-14, BS+28, BS+28);
+  ctx.drawImage(bc, BX, BY);
+  ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
+  ctx.strokeRect(BX, BY, BS, BS);
+  drawMarbles();
+  drawPierce();
+  drawBombs();
+  drawNukes();
+  for(const c of cannons) drawCannon(c);
+  drawWaves();
+  drawShockwaves();
+  drawHUD();
+  drawPlinko();
+  drawWheel();
+  drawUltimate();
+  drawParticles();
+  drawToasts();
+  if(gameOver) drawOver();
+}
+function drawMarbles(){
+  for(let c=0;c<4;c++){
+    ctx.fillStyle = TEAMS[c].ball;
+    ctx.beginPath();
+    for(const m of marbles){
+      if(m.c !== c) continue;
+      ctx.moveTo(m.x+MR, m.y);
+      ctx.arc(m.x, m.y, MR, 0, 6.283);
+    }
+    ctx.fill();
+  }
+}
+function drawPierce(){
+  for(const p of pierceBalls){
+    const tm = TEAMS[p.c];
+    ctx.fillStyle = tm.ball;
+    ctx.beginPath(); ctx.arc(p.x, p.y, PR, 0, 6.283); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+    // 球上方显示当前生命值
+    ctx.font = 'bold 13px Verdana';
+    ctx.textAlign = 'center';
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
+    ctx.strokeText(fmt(p.hp), p.x, p.y - PR - 5);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(fmt(p.hp), p.x, p.y - PR - 5);
+  }
+  ctx.textAlign = 'left';
+}
+function drawBombs(){
+  for(const b of bombBalls){
+    if(b.dead) continue;
+    ctx.fillStyle = '#1c1c1f';
+    ctx.beginPath(); ctx.arc(b.x, b.y, BBR, 0, 6.283); ctx.fill();
+    ctx.strokeStyle = TEAMS[b.c].ball; ctx.lineWidth = 3; ctx.stroke();
+    // 闪烁的引信火花
+    if(Math.sin(t*20) > 0){
+      ctx.fillStyle = '#ffd24a';
+      ctx.beginPath(); ctx.arc(b.x+BBR*0.5, b.y-BBR*0.9, 2.5, 0, 6.283); ctx.fill();
+    }
+  }
+}
+function drawNukes(){
+  for(const b of nukeBalls){
+    if(b.dead) continue;
+    ctx.fillStyle = '#101010';
+    ctx.beginPath(); ctx.arc(b.x, b.y, NBR, 0, 6.283); ctx.fill();
+    ctx.strokeStyle = TEAMS[b.c].ball; ctx.lineWidth = 3; ctx.stroke();
+    ctx.fillStyle = '#ffd24a';
+    ctx.font = 'bold 12px Verdana';
+    ctx.textAlign = 'center';
+    ctx.fillText('☢', b.x, b.y+4);
+  }
+  ctx.textAlign = 'left';
+}
+function drawShockwaves(){
+  ctx.save();
+  ctx.beginPath(); ctx.rect(BX, BY, BS, BS); ctx.clip();   // 只画在战场内
+  for(const w of shockwaves){
+    const a = Math.max(0.15, 1 - w.r/NUKE_R);
+    ctx.globalAlpha = 0.10*a;
+    ctx.fillStyle = TEAMS[w.c].ball;
+    ctx.beginPath(); ctx.arc(w.x, w.y, w.r, 0, 6.283); ctx.fill();
+    ctx.globalAlpha = 0.70*a + 0.15;
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.arc(w.x, w.y, w.r, 0, 6.283); ctx.stroke();
+    ctx.strokeStyle = TEAMS[w.c].ball; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(w.x, w.y, Math.max(0, w.r-6), 0, 6.283); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+function drawWaves(){
+  for(const w of waves){
+    ctx.globalAlpha = Math.max(0, 1 - w.r/w.max);
+    ctx.strokeStyle = w.col;
+    ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.arc(w.x, w.y, w.r, 0, 6.283); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+function drawCannon(c){
+  if(!c.alive){
+/*     ctx.fillStyle = '#222';
+    ctx.beginPath(); ctx.arc(c.x, c.y, 16, 0, 6.283); ctx.fill(); */
+    return;
+  }
+  const tm = TEAMS[c.idx];
+  // 护盾
+  if(shielded(c)){
+    ctx.globalAlpha = 0.45 + 0.20*Math.sin(t*8);
+    ctx.fillStyle = tm.ball;
+    ctx.beginPath(); ctx.arc(c.x, c.y, SHIELD_R, 0, 6.283); ctx.fill();
+    ctx.globalAlpha = 0.9;
+    if(c.shield > 0){            // 计时护盾:剩余时间弧
+      ctx.strokeStyle = tm.ball; ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, SHIELD_R, -Math.PI/2, -Math.PI/2 + 6.283*Math.min(1, c.shield/10));
+      ctx.stroke();
+    }
+    if(c.shieldHp > 0){          // 永久护盾:白圈 + 护盾值
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(c.x, c.y, SHIELD_R+5, 0, 6.283); ctx.stroke();
+      ctx.font = 'bold 13px Verdana';
+      ctx.textAlign = 'center';
+      ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
+      ctx.strokeText('' + c.shieldHp, c.x, c.y - SHIELD_R - 10);
+      ctx.fillStyle = '#fff';
+      ctx.fillText('' + c.shieldHp, c.x, c.y - SHIELD_R - 10);
+      ctx.textAlign = 'left';
+    }
+    ctx.globalAlpha = 1;
+  }
+  ctx.save();
+  ctx.translate(c.x, c.y); ctx.rotate(c.aim);
+  ctx.fillStyle = shade(tm.ball, -0.55);
+  ctx.fillRect(0, -6, 34, 12);
+  ctx.restore();
+  const g = ctx.createRadialGradient(c.x-6, c.y-6, 4, c.x, c.y, 22);
+  g.addColorStop(0, shade(tm.ball, -0.15));
+  g.addColorStop(1, shade(tm.ball, -0.70));
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(c.x, c.y, 20, 0, 6.283); ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 2; ctx.stroke();
+  // 血条
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(c.x-26, c.y-38, 52, 7);
+  ctx.fillStyle = c.hp > c.maxHp*0.3 ? '#5be05b' : '#ff5050';
+  ctx.fillRect(c.x-25, c.y-37, 50*Math.max(0,c.hp)/c.maxHp, 5);
+}
+function drawHUD(){
+  const pos = [
+    {x:BX+4,    y:BY-58,    a:'left' },
+    {x:BX+BS-4, y:BY-58,    a:'right'},
+    {x:BX+4,    y:BY+BS+38, a:'left' },
+    {x:BX+BS-4, y:BY+BS+38, a:'right'},
+  ];
+  for(let i=0;i<4;i++){
+    const c = cannons[i], tm = TEAMS[i], p = pos[i];
+    ctx.textAlign = p.a;
+    ctx.fillStyle = tm.ball;
+    ctx.font = 'bold 24px Verdana, sans-serif';
+    if(!c.alive){ ctx.fillText(tm.name + ' 已淘汰', p.x, p.y+13); continue; }
+    ctx.fillText('HP:' + c.hp + '/' + c.maxHp + (c.lives > 0 ? '  \u2665\u00d7' + c.lives : ''), p.x, p.y);
+    ctx.font = 'bold 19px Verdana, sans-serif';
+    ctx.fillText(fmt(c.ammo) + ' 弹药 · ' + fmt(counts[i]+c.queue) + ' 弹珠', p.x, p.y+26);
+  }
+  ctx.textAlign = 'left';
+}
+function drawPlinko(){
+  ctx.fillStyle = '#0d0d10';
+  ctx.fillRect(PX-6, PY-6, PW+12, PH+12);
+  ctx.strokeStyle = '#2a2a30'; ctx.lineWidth = 2;
+  ctx.strokeRect(PX-6, PY-6, PW+12, PH+12);
+  ctx.fillStyle = '#d8d8d8';
+  ctx.beginPath();
+  for(const p of pegs){ ctx.moveTo(p.x+4, p.y); ctx.arc(p.x, p.y, 4, 0, 6.283); }
+  ctx.fill();
+  const sy = PY+PH-SLOT_H;
+  const bd = slotBounds();
+  const zones = [[0,bd[0],'RELEASE'],[bd[0],bd[1],'MULTIPLY'],[bd[1],1,'SPIN']];
+  for(let i=0;i<3;i++){
+    const z = zones[i], x0 = PX+PW*z[0], w = PW*(z[1]-z[0]);
+    const lit = flashes.some(f => f.slot === i);
+    ctx.fillStyle = lit ? '#ffe27a' : '#f2f2f2';
+    ctx.fillRect(x0, sy, w-3, SLOT_H);
+    ctx.fillStyle = '#111';
+    ctx.textAlign = 'center';
+    // 字号随槽位宽度自适应(RELEASE 变窄后字也跟着缩)
+    const fs = Math.max(9, Math.min(19, (w-14)/(z[2].length*0.62)));
+    ctx.font = 'bold ' + fs.toFixed(0) + 'px Verdana';
+    ctx.fillText(z[2], x0+(w-3)/2, sy+SLOT_H/2+fs*0.36);
+  }
+  for(const b of plinkoBalls){
+    ctx.fillStyle = TEAMS[b.c].ball;
+    ctx.beginPath(); ctx.arc(b.x, b.y, PBR, 0, 6.283); ctx.fill();
+  }
+  ctx.textAlign = 'left';
+}
+function drawWheel(){
+  // 底板
+  ctx.fillStyle = '#0d0d10';
+  ctx.beginPath(); ctx.arc(WX, WY, WR+30, 0, 6.283); ctx.fill();
+  ctx.strokeStyle = '#2a2a30'; ctx.lineWidth = 2; ctx.stroke();
+  // 旋转的技能圆环(8 常规扇区 + 1 个 ★ 小扇区)
+  const ss = smallSeg();
+  const bs = bigSeg();
+  for(let s=0;s<9;s++){
+    const a0 = theta + Math.min(s,8) * bs;
+    const a1 = s < 8 ? a0 + bs : theta + Math.PI*2;
+    const fl = segFlashes.find(f => f.s === s);
+    if(fl){
+      ctx.globalAlpha = Math.min(1, fl.t/0.4);
+      ctx.fillStyle = fl.col;
+    } else if(s === 8){
+      ctx.fillStyle = '#8a6b14';
+    } else {
+      ctx.fillStyle = s%2 ? '#17171c' : '#0e0e12';
+    }
+    ctx.beginPath();
+    ctx.arc(WX, WY, WR, a0, a1);
+    ctx.arc(WX, WY, IR, a1, a0, true);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = '#3a3a42'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(WX+Math.cos(a0)*IR, WY+Math.sin(a0)*IR);
+    ctx.lineTo(WX+Math.cos(a0)*WR, WY+Math.sin(a0)*WR);
+    ctx.stroke();
+    const am = (a0+a1)/2, lr = (IR+WR)/2;
+    ctx.save();
+    ctx.translate(WX+Math.cos(am)*lr, WY+Math.sin(am)*lr);
+    ctx.rotate(am + Math.PI/2);
+    ctx.fillStyle = s === 8 ? '#ffe27a' : '#e8e8e8';
+    ctx.font = s === 8 ? 'bold 10px Verdana' : 'bold 12px Verdana';
+    ctx.textAlign = 'center';
+    ctx.fillText(s === 8 ? '★' : LABELS[s], 0, 4);
+    ctx.restore();
+  }
+  // 外缘
+  ctx.strokeStyle = '#e8e8e8'; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.arc(WX, WY, WR, 0, 6.283); ctx.stroke();
+  // 内圈弹跳区
+  ctx.fillStyle = '#050507';
+  ctx.beginPath(); ctx.arc(WX, WY, IR-4, 0, 6.283); ctx.fill();
+  // 固定内圈挡板(只留底部小口)
+  ctx.strokeStyle = '#e8e8e8'; ctx.lineWidth = 7; ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.arc(WX, WY, IR, Math.PI/2 + GAP_HALF, Math.PI/2 - GAP_HALF + Math.PI*2);
+  ctx.stroke();
+  ctx.lineCap = 'butt';
+  // 旋转的圆形反弹节点
+  ctx.fillStyle = '#d8d8d8';
+  ctx.beginPath();
+  for(const p of wheelPegs){
+    const pp = pegPos(p, WX, WY), px = pp[0], py = pp[1];
+    ctx.moveTo(px+5, py); ctx.arc(px, py, 5, 0, 6.283);
+  }
+  ctx.fill();
+  // 小球
+  for(const b of wheelBalls){
+    ctx.fillStyle = TEAMS[b.c].ball;
+    ctx.beginPath(); ctx.arc(b.x, b.y, PBR, 0, 6.283); ctx.fill();
+  }
+  ctx.textAlign = 'left';
+}
+function drawUltimate(){
+  // 底板(金色描边以示终极)
+  ctx.fillStyle = '#0d0d10';
+  ctx.beginPath(); ctx.arc(WX2, WY2, WR+30, 0, 6.283); ctx.fill();
+  ctx.strokeStyle = '#6b5a1f'; ctx.lineWidth = 2; ctx.stroke();
+  for(let s=0;s<6;s++){
+    const a0 = theta2 + s*SEG2, a1 = a0 + SEG2;
+    const fl = segFlashes2.find(f => f.s === s);
+    if(fl){
+      ctx.globalAlpha = Math.min(1, fl.t/0.4);
+      ctx.fillStyle = fl.col;
+    } else {
+      ctx.fillStyle = s%2 ? '#1d1709' : '#120e06';
+    }
+    ctx.beginPath();
+    ctx.arc(WX2, WY2, WR, a0, a1);
+    ctx.arc(WX2, WY2, IR, a1, a0, true);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = '#4a3f1d'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(WX2+Math.cos(a0)*IR, WY2+Math.sin(a0)*IR);
+    ctx.lineTo(WX2+Math.cos(a0)*WR, WY2+Math.sin(a0)*WR);
+    ctx.stroke();
+    const am = a0 + SEG2/2, lr = (IR+WR)/2;
+    ctx.save();
+    ctx.translate(WX2+Math.cos(am)*lr, WY2+Math.sin(am)*lr);
+    ctx.rotate(am + Math.PI/2);
+    ctx.fillStyle = '#ffe27a';
+    ctx.font = 'bold 13px Verdana';
+    ctx.textAlign = 'center';
+    ctx.fillText(ULT_LABELS[s], 0, 4);
+    ctx.restore();
+  }
+  ctx.strokeStyle = '#ffd24a'; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.arc(WX2, WY2, WR, 0, 6.283); ctx.stroke();
+  ctx.fillStyle = '#050507';
+  ctx.beginPath(); ctx.arc(WX2, WY2, IR-4, 0, 6.283); ctx.fill();
+  ctx.strokeStyle = '#e8e8e8'; ctx.lineWidth = 7; ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.arc(WX2, WY2, IR, Math.PI/2 + GAP_HALF, Math.PI/2 - GAP_HALF + Math.PI*2);
+  ctx.stroke();
+  ctx.lineCap = 'butt';
+  ctx.fillStyle = '#d8d8d8';
+  ctx.beginPath();
+  for(const p of wheelPegs){
+    const pp = pegPos(p, WX2, WY2), px = pp[0], py = pp[1];
+    ctx.moveTo(px+5, py); ctx.arc(px, py, 5, 0, 6.283);
+  }
+  ctx.fill();
+  for(const b of ultraBalls){
+    ctx.fillStyle = TEAMS[b.c].ball;
+    ctx.beginPath(); ctx.arc(b.x, b.y, PBR, 0, 6.283); ctx.fill();
+  }
+  ctx.textAlign = 'left';
+}
+function drawParticles(){
+  for(const p of particles){
+    ctx.globalAlpha = Math.max(0, p.life/p.max);
+    ctx.fillStyle = p.col;
+    ctx.fillRect(p.x-p.sz/2, p.y-p.sz/2, p.sz, p.sz);
+  }
+  ctx.globalAlpha = 1;
+}
+function drawToasts(){
+  ctx.textAlign = 'center';
+  let y = 46;
+  for(const o of toasts){
+    ctx.globalAlpha = Math.min(1, o.t/0.5);
+    ctx.font = 'bold 20px Verdana';
+    const w = ctx.measureText(o.text).width + 24;
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(800-w/2, y-20, w, 28);
+    ctx.fillStyle = o.col;
+    ctx.fillText(o.text, 800, y);
+    y += 34;
+  }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'left';
+}
+function drawOver(){
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(0,0,W,H);
+  ctx.textAlign = 'center';
+  if(winner){
+    ctx.fillStyle = TEAMS[winner.idx].ball;
+    ctx.font = 'bold 72px Verdana';
+    ctx.fillText('🏆 ' + TEAMS[winner.idx].name + ' 获胜!', 800, 430);
+  } else {
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 72px Verdana';
+    ctx.fillText('平局!', 800, 430);
+  }
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 26px Verdana';
+  ctx.fillText('点击画面或"重新开始"按钮再来一局', 800, 490);
+  ctx.textAlign = 'left';
+}
+
+/* ---------- 主循环(子步进保证物理稳定) ---------- */
+function step(h){
+  t += h;
+  if(!gameOver){
+    updateCannons(h);
+    updateMarbles(h);
+    updatePierce(h);
+    updateBombs(h);
+    updateNukes(h);
+    updateShockwaves(h);
+    updatePlinko(h);
+    updateWheel(h);
+    updateUltimate(h);
+    checkWin(h);
+  } else if(winner){
+    confettiT -= h;
+    if(confettiT <= 0){
+      confettiT = 0.08;
+      particles.push({ x:rand(0,W), y:-10, vx:rand(-40,40), vy:rand(120,320),
+                       life:rand(1,2), max:2, col:TEAMS[winner.idx].ball, sz:rand(3,6) });
+    }
+  }
+  updateParticles(h);
+  updateWaves(h);
+  updateToasts(h);
+}
+let prev = performance.now();
+function frame(now){
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, (now-prev)/1000);
+  prev = now;
+  if(!paused){
+    const sim = dt*SPEED;
+    const steps = Math.min(8, Math.max(1, Math.ceil(sim/0.012)));
+    const h = sim/steps;
+    for(let s=0;s<steps;s++) step(h);
+  }
+  render();
+}
+
+/* ---------- 控件 ---------- */
+const btnPause = document.getElementById('btnPause');
+btnPause.onclick = () => {
+  paused = !paused;
+  btnPause.textContent = paused ? '▶ 继续' : '⏸ 暂停';
+};
+document.getElementById('btnReset').onclick = () => reset();
+document.querySelectorAll('.sp').forEach(b => {
+  b.onclick = () => {
+    SPEED = +b.dataset.s;
+    document.querySelectorAll('.sp').forEach(x => x.classList.toggle('active', x === b));
+  };
+});
+cv.addEventListener('click', () => { if(gameOver) reset(); });
+
+reset();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
