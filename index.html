@@ -21,6 +21,40 @@
   #cv{display:block;width:100%;max-width:1560px;margin:0 auto;background:#000;border-radius:10px;}
   footer{max-width:1560px;margin:4px auto 18px;padding:0 14px;color:#888;font-size:12.5px;line-height:1.8;}
   footer b{color:#ccc;}
+  /* ---- 通用遮罩 ---- */
+  .overlay{position:fixed;inset:0;background:rgba(5,5,8,0.86);display:flex;
+           align-items:center;justify-content:center;z-index:50;backdrop-filter:blur(3px);}
+  .overlay.hidden{display:none;}
+  .modal{position:relative;background:#101014;border:1px solid #2a2a30;border-radius:14px;
+         padding:22px 26px;max-height:88vh;overflow:auto;box-shadow:0 16px 60px rgba(0,0,0,0.6);}
+  .modal h2{font-size:20px;letter-spacing:1px;margin-bottom:6px;}
+  .modal h3{font-size:14px;color:#bbb;margin:16px 0 8px;letter-spacing:1px;}
+  /* ---- 选择界面 ---- */
+  #setup .modal{width:min(960px,94vw);}
+  .teamGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;}
+  .teamCard{border:2px solid #2a2a30;border-radius:10px;padding:14px;}
+  .teamCard h4{font-size:16px;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+  .dot{width:16px;height:16px;border-radius:50%;display:inline-block;}
+  .traitRow{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;}
+  .traitBtn{font-size:12px;padding:5px 9px;border-radius:6px;border:1px solid #2a2a30;
+            background:#16161b;color:#ddd;cursor:pointer;}
+  .traitBtn.sel{background:#e8e8e8;color:#111;font-weight:bold;border-color:#e8e8e8;}
+  .traitDesc{font-size:11.5px;color:#999;line-height:1.5;min-height:32px;}
+  .startBtn{margin-top:18px;width:100%;padding:12px;font-size:16px;font-weight:bold;
+            background:#3ad07f;color:#04210f;border:none;border-radius:8px;cursor:pointer;}
+  /* ---- 调试面板 ---- */
+  #debug{justify-content:flex-end;align-items:stretch;background:rgba(5,5,8,0.35);}
+  #debug .modal{width:min(440px,92vw);border-radius:0;}
+  .dbgTeam{border:1px solid #23232a;border-radius:8px;padding:8px 10px;margin-bottom:10px;}
+  .dbgTeam summary{cursor:pointer;font-weight:bold;font-size:14px;display:flex;align-items:center;gap:8px;}
+  .dbgField{display:flex;align-items:center;gap:8px;margin:7px 0;font-size:12.5px;}
+  .dbgField label{flex:0 0 120px;color:#aaa;}
+  .dbgField input[type=range]{flex:1;min-width:0;}
+  .dbgField .val{flex:0 0 56px;text-align:right;color:#fff;font-variant-numeric:tabular-nums;}
+  .dbgField select{flex:1;background:#16161b;color:#ddd;border:1px solid #2a2a30;border-radius:5px;padding:4px;}
+  .dbgGlobal{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+  .dbgGlobal button{font-size:12px;padding:5px 10px;}
+  .closeX{position:absolute;top:12px;right:16px;cursor:pointer;font-size:22px;color:#888;line-height:1;}
 </style>
 </head>
 <body>
@@ -29,11 +63,35 @@
   <div class="ctrl">
     <button id="btnPause">⏸ 暂停</button>
     <button id="btnReset">↻ 重新开始</button>
+    <button id="btnSetup">⚙ 选择炮台</button>
+    <button id="btnDebug">🛠 调试面板</button>
     <button class="sp active" data-s="1">1×</button>
     <button class="sp" data-s="2">2×</button>
     <button class="sp" data-s="4">4×</button>
   </div>
 </header>
+<!-- 开局选择界面 -->
+<div id="setup" class="overlay">
+  <div class="modal">
+    <h2>选择炮台专属特性</h2>
+    <p style="color:#999;font-size:13px;margin-bottom:6px;">为四个炮台各选一项专属特性,然后开始对战。</p>
+    <div class="teamGrid" id="setupGrid"></div>
+    <button class="startBtn" id="btnStart">开始对战 ▶</button>
+  </div>
+</div>
+<!-- 调试面板 -->
+<div id="debug" class="overlay hidden">
+  <div class="modal">
+    <span class="closeX" id="dbgClose">×</span>
+    <h2>🛠 调试面板</h2>
+    <div class="dbgGlobal">
+      <button id="dbgHealAll">全员回满血</button>
+      <button id="dbgAmmo1k">全员弹药+1000</button>
+      <button id="dbgClearMarbles">清空场上弹珠</button>
+    </div>
+    <div id="dbgBody"></div>
+  </div>
+</div>
 <div id="wrap"><canvas id="cv" width="1600" height="900"></canvas></div>
 <footer>
   <b>规则:</b>左上弹珠面板不断掉落四色小球;RELEASE 与 MULTIPLY 开局等宽,随时间 RELEASE 渐窄、MULTIPLY 渐宽,
@@ -43,14 +101,20 @@
   <b>八个技能:</b>+n(弹药+n,每触发一次 n 加 1)/ 护盾(10 秒,敌方小球碰到即消失)/ ×4(弹药×4)/
   偷取(夺走弹药最多对手的一半弹药)/ 炸弹(发射炸弹弹珠,碰到不同颜色区域时大范围爆炸:染色并清除范围内敌方小球与贯穿弹)/
   贯穿弹(消耗一半弹药,逐格染色每格扣 1 生命,命中炮台造成剩余生命值伤害,撞护盾扣 1 反弹)/
-  回血(生命回满)/ 上限+10(生命上限+10)。
+  回血(生命回满)/ 上限+10(生命上限+10)/ 追踪弹(缓慢移动并转向最近敌方炮台,生命 = 待发弹药 10%)。
   转盘上金色 <b>★</b> 小扇区会把小球送入下方<b>终极转盘</b>:+弹珠(面板循环小球+1)/ 上限+50 /
   盾100(100 点永久护盾,可叠加,被打空才消失)/ ×10(弹药×10)/
   +1命(阵亡时满血复活并获 20 秒护盾,弹药与场上弹珠清零,可叠加)/
-  核弹(碰到异色区域引爆,缓慢扩散的冲击波吞噬范围内其他颜色的所有小球,但不改变网格颜色)。
+  核弹(碰到异色区域引爆,缓慢扩散的冲击波吞噬范围内其他颜色的所有小球,但不改变网格颜色)/
+  底弹+1(RELEASE 后的弹药底数 +1,可累加)。
+  新增专属特性:固土(每 15 秒己方格子生命 +1)、重弹(小球生命翻倍但 RELEASE 转换比率降为 0.5)、
+  游牧(炮台极缓慢在己方领土漂移,撞非己方格扣血占领并反弹)、磁场(弱磁场排斥接近的敌方弹珠,对炸弹/核弹减半)、
+  相位(己方弹珠无阻力、可与敌方弹珠互撞抵消生命、撞墙小概率变向)。
   面板小球为循环制:每色 2 颗起步,落入底部槽位后回到顶部重新下落。
-  战场上弹珠没有寿命限制,会一直滚动;碰到第一个非己方颜色的格子时把它染成己方颜色并随即消失(一珠换一格)。
-  只有把己方领地一路铺到敌方炮台脚下,弹珠才能直接命中炮台造成伤害——炮台 80 血,归零爆炸淘汰,活到最后的颜色获胜。
+  <b>RPG:</b>每格有生命值(默认 1),弹珠也有生命值(默认 1)。弹珠撞到异色格子时双方互拼生命,每点抵 1 点;
+  格子生命归零才翻色(并重置为 1 血),弹珠生命归零则消失——生命值越高的格子越暗,像一层层护甲。
+  开局可为每个炮台选<b>专属特性</b>(增殖 / 应激护盾 / 背水回血 / 环卫挡板),顶栏"🛠 调试面板"可实时改动所有数值。
+  炮台 100 血,归零爆炸淘汰(有额外生命则满血复活),活到最后的颜色获胜。
 </footer>
 <script>
 'use strict';
@@ -91,6 +155,32 @@ const TEAMS = [
 ];
 const NEUTRAL = '#9c9c9c';
 
+/* ---------- 专属特性表 ---------- */
+const TRAITS = {
+  none:   { name:'无',         desc:'没有专属特性。' },
+  plinko: { name:'增殖',       desc:'初始面板弹珠 +1;每击杀一个敌方炮台,面板弹珠再 +1;每 2 秒获得等于面板弹珠数的弹药。' },
+  dmgshd: { name:'应激护盾',   desc:'每累计受到 50 点伤害,自动开启 10 秒护盾。' },
+  regen:  { name:'背水回血',   desc:'占领格数 < 全场 1/4 时回血:默认每 2 秒回 1 血;生命 < 50% 每秒回 1 血;生命 < 10% 每秒回 2 血。' },
+  guard:  { name:'环卫',       desc:'炮台周身环绕 4 片旋转扇形挡板,挡下敌方弹珠。' },
+  cellreg:{ name:'固土',       desc:'每 15 秒,己方所有格子生命值 +1(颜色越深血越厚)。' },
+  dblhp:  { name:'重弹',       desc:'发射的小球生命值翻倍;但 RELEASE 时弹药转待发的比率降为 0.5。' },
+  nomad:  { name:'游牧',       desc:'炮台极缓慢地在己方领土漂移;遇到非己方格子会扣其 1 血、占领并反弹。' },
+  magnet: { name:'磁场',       desc:'炮台周围有弱磁场,轻微排斥接近的敌方弹珠(对炸弹、核弹效果减半)。' },
+  phase:  { name:'相位',       desc:'己方普通弹珠无阻力,可与敌方弹珠碰撞抵消生命;撞墙有小概率改变角度。' },
+};
+const TRAIT_KEYS = Object.keys(TRAITS);
+
+/* ---------- 全局可调配置(调试面板写入) ---------- */
+const CFG = {
+  trait: ['plinko','dmgshd','regen','guard'],   // 四色默认特性(选择界面可改)
+  spMin: [90,90,90,90],   // 弹珠初速下限
+  spMax: [160,160,160,160],   // 弹珠初速上限
+  damp:  [0.95,0.95,0.95,0.95],// 弹珠阻力(每秒保留比例)
+  swing: [1.0,1.0,1.0,1.0],   // 炮口摆动幅度(弧度)
+  fireRateMax: [500,500,500,500], // 射速上限
+  marbleDmg: [1,1,1,1],       // 单颗弹珠伤害(对格子与炮台)
+};
+
 /* ---------- 工具 ---------- */
 const rand = (a,b) => a + Math.random()*(b-a);
 function shade(hex, f){
@@ -112,35 +202,52 @@ function norm(a){ a %= Math.PI*2; if(a < 0) a += Math.PI*2; return a; }
 const bc = document.createElement('canvas');
 bc.width = BS; bc.height = BS;
 const bctx = bc.getContext('2d');
-let cells;
+let cells;      // 每格所属颜色(-1 中立)
+let cellHp;     // 每格生命值
 
 function drawCell(i, j, o){
   bctx.fillStyle = o < 0 ? NEUTRAL : TEAMS[o].cell;
   bctx.fillRect(i*CS, j*CS, CS, CS);
+  // 生命值 >1 的格子叠一层暗色表示"护甲",越厚越暗
+  const hp = cellHp[j*N+i];
+  if(hp > 1){
+    bctx.fillStyle = 'rgba(0,0,0,' + Math.min(0.72, 0.06*(hp-1)) + ')';
+    bctx.fillRect(i*CS, j*CS, CS, CS);
+  }
   bctx.strokeStyle = 'rgba(0,0,0,0.30)';
   bctx.lineWidth = 1;
   bctx.strokeRect(i*CS+0.5, j*CS+0.5, CS-1, CS-1);
 }
+// 直接设置(初始化/技能用):颜色 o,生命值 hp
+function setCell(i, j, o, hp){
+  if(i<0 || j<0 || i>=N || j>=N) return;
+  const k = j*N + i;
+  cells[k] = o; cellHp[k] = hp;
+  drawCell(i, j, o);
+}
+// 兼容旧调用:染色并把生命值设为 1
 function paintCell(i, j, o){
   if(i<0 || j<0 || i>=N || j>=N) return;
   const k = j*N + i;
-  if(cells[k] === o) return;
-  cells[k] = o;
+  if(cells[k] === o && cellHp[k] === 1) return;
+  cells[k] = o; cellHp[k] = 1;
   drawCell(i, j, o);
 }
+// 攻击一格:扣 dmg 点;格子血归零→翻色、补满 1 血(实际逐格逻辑在弹珠循环内联实现)
 
 /* ---------- 状态 ---------- */
-let cannons, marbles, counts, plinkoBalls, wheelBalls, pierceBalls, bombBalls, nukeBalls, ultraBalls, shockwaves, waves, particles, toasts, flashes, segFlashes, segFlashes2;
+let cannons, marbles, counts, plinkoBalls, wheelBalls, pierceBalls, bombBalls, nukeBalls, homingBalls, ultraBalls, shockwaves, waves, particles, toasts, flashes, segFlashes, segFlashes2;
 let t, spawnTimer, rrIdx, theta, theta2, pegTheta, plusVal, gameOver, winner, winTimer, confettiT;
 
 function reset(){
   t=0; spawnTimer=0; rrIdx=0; theta=0; theta2=0; pegTheta=0;
   plusVal=1; LABELS[0]='+1';
   gameOver=false; winner=null; winTimer=0; confettiT=0;
-  marbles=[]; plinkoBalls=[]; wheelBalls=[]; pierceBalls=[]; bombBalls=[]; nukeBalls=[]; ultraBalls=[]; shockwaves=[]; waves=[];
+  marbles=[]; plinkoBalls=[]; wheelBalls=[]; pierceBalls=[]; bombBalls=[]; nukeBalls=[]; homingBalls=[]; ultraBalls=[]; shockwaves=[]; waves=[];
   particles=[]; toasts=[]; flashes=[]; segFlashes=[]; segFlashes2=[];
   counts=[0,0,0,0];
   cells = new Int16Array(N*N).fill(-1);
+  cellHp = new Int16Array(N*N).fill(1);   // 每格默认生命值 1
 
   // 初始领地:四角四分之一圆
   const R = N*0.40;
@@ -159,13 +266,35 @@ function reset(){
     const ci = tm.corner[0] ? N-1-off : off;
     const cj = tm.corner[1] ? N-1-off : off;
     const x = BX + (ci+0.5)*CS, y = BY + (cj+0.5)*CS;
-    return { idx, x, y, hp:MAX_HP, maxHp:MAX_HP, shield:0, shieldHp:0, lives:0, purge:false,
+    const c = { idx, x, y, hp:MAX_HP, maxHp:MAX_HP, shield:0, shieldHp:0, lives:0, purge:false,
              ammo:1, queue:10, fireAcc:0, dmgCd:0, alive:true,
+             trait:CFG.trait[idx],          // 专属特性
+             dmgTaken:0,                     // 累计受伤(护盾特性用)
+             regenAcc:0,                     // 回血计时(逆境回血特性用)
+             cellRegAcc:0,                   // 固土计时(格子+血特性用)
+             plinkoAcc:0,                    // 增殖计时(每2秒获弹药特性用)
+             nomadDir:Math.random()*6.283,   // 游牧漂移方向
+             guards:[],                      // 环绕防御挡板
              phase:Math.random()*6.283,
-             base:Math.atan2(BY+BS/2 - y, BX+BS/2 - x), aim:0 };
+             base:Math.atan2(BY+BS/2 - y, BX+BS/2 - x), aim:0,
+             baseAmmo:1,                     // RELEASE 后弹药重置底数(终极技能可加)
+             // 可调参数(调试面板写入,优先于全局默认)
+             ammoMul:1 };
+    initTrait(c);
+    return c;
   });
-  // 弹珠面板:每色初始 2 颗循环小球
-  for(let i=0;i<4;i++) plinkoBalls.push(newPlinkoBall(i), newPlinkoBall(i));
+  // 弹珠面板:每色初始小球(受 +1 弹珠特性影响)
+  for(let i=0;i<4;i++){
+    const base = 2 + (cannons[i].trait === 'plinko' ? 1 : 0);
+    for(let n=0;n<base;n++) plinkoBalls.push(newPlinkoBall(i));
+  }
+}
+// ---- 专属特性初始化 ----
+function initTrait(c){
+  c.guards = [];
+  if(c.trait === 'guard'){
+    for(let g=0;g<4;g++) c.guards.push({ ang:g*Math.PI/2, alive:true });
+  }
 }
 
 /* ============================================================
@@ -174,29 +303,164 @@ function reset(){
 function updateCannons(h){
   for(const c of cannons){
     if(!c.alive) continue;
+    const id = c.idx;
     c.dmgCd -= h;
     if(c.shield > 0) c.shield = Math.max(0, c.shield - h);
-    c.aim = c.base + Math.sin(t*1.0 + c.phase)*1.0;   // 炮口左右摆动
-    const rate = Math.min(500, 10 + c.queue*0.15);    // 待发越多射速越快
+    if(c.trait === 'nomad') c.aim += h*NOMAD_SPIN;              // 游牧:炮口持续旋转
+    else c.aim = c.base + Math.sin(t*1.0 + c.phase)*CFG.swing[id];   // 炮口摆动幅度可调
+    const rate = Math.min(CFG.fireRateMax[id], 10 + c.queue*0.15);
     c.fireAcc += h*rate;
     while(c.fireAcc >= 1 && c.queue > 0){
       c.fireAcc -= 1;
-      if(counts[c.idx] >= MARBLE_CAP) break;
+      if(counts[id] >= MARBLE_CAP) break;
       c.queue--;
       fireMarble(c);
     }
     if(c.fireAcc > 3) c.fireAcc = 3;
+    // 环卫:挡板缓慢旋转
+    if(c.guards.length) for(const g of c.guards) g.ang += h*1.4;
+    // 背水回血:占领 < 1/4 全场时回血;生命越低回得越快
+    if(c.trait === 'regen' && c.hp < c.maxHp){
+      if(territory(id) < N*N/4){
+        const ratio = c.hp / c.maxHp;
+        let interval = 2, amount = 1;            // 默认:每 2 秒回 1 血
+        if(ratio < 0.10){ interval = 1; amount = 2; }       // 低于10%:每秒回 2 血
+        else if(ratio < 0.50){ interval = 1; amount = 1; }  // 低于50%:每秒回 1 血
+        c.regenAcc += h;
+        if(c.regenAcc >= interval){ c.regenAcc -= interval; c.hp = Math.min(c.maxHp, c.hp+amount); spark(c.x, c.y-30, '#5be05b'); }
+      } else c.regenAcc = 0;
+    }
+    // 固土:每 15 秒己方所有格子生命 +1
+    if(c.trait === 'cellreg'){
+      c.cellRegAcc += h;
+      if(c.cellRegAcc >= 15){
+        c.cellRegAcc -= 15;
+        for(let k=0;k<cells.length;k++){
+          if(cells[k] === id){ cellHp[k]++; drawCell(k%N, (k/N)|0, id); }
+        }
+        toast('🧱 ' + TEAMS[id].name + ' 固土:全域格子 +1 生命', TEAMS[id].ball);
+      }
+    }
+    // 增殖:每 2 秒获得 = 面板弹珠数 的弹药
+    if(c.trait === 'plinko'){
+      c.plinkoAcc += h;
+      if(c.plinkoAcc >= 2){
+        c.plinkoAcc -= 2;
+        let n = 0; for(const b of plinkoBalls) if(b.c === id) n++;
+        if(n > 0){ c.ammo = Math.min(AMMO_CAP, c.ammo + n); spark(c.x, c.y-30, TEAMS[id].ball); }
+      }
+    }
+    // 游牧:极缓慢漂移,遇非己方格子→扣血占领并反弹
+    if(c.trait === 'nomad') nomadMove(c, h);
   }
 }
+const NOMAD_SPEED = 18;   // 游牧漂移速度(像素/秒,极慢)
+const NOMAD_SPIN = 1.5;   // 游牧炮口旋转角速度(弧度/秒)
+function nomadMove(c, h){
+  // 偶尔轻微改变方向,漂得更自然
+  c.nomadDir += rand(-0.6, 0.6)*h;
+  const nx = c.x + Math.cos(c.nomadDir)*NOMAD_SPEED*h;
+  const ny = c.y + Math.sin(c.nomadDir)*NOMAD_SPEED*h;
+  // 战场边界反弹
+  if(nx < BX+30 || nx > BX+BS-30){ c.nomadDir = Math.PI - c.nomadDir; return; }
+  if(ny < BY+30 || ny > BY+BS-30){ c.nomadDir = -c.nomadDir; return; }
+  const ci = ((nx-BX)/CS)|0, cj = ((ny-BY)/CS)|0;
+  const k = cj*N + ci;
+  if(ci>=0 && cj>=0 && ci<N && cj<N && cells[k] !== c.idx){
+    // 撞到非己方格子:扣 1 血,破则占领,然后反弹(不前进)
+    cellHp[k]--;
+    if(cellHp[k] <= 0){ cells[k] = c.idx; cellHp[k] = 1; }
+    drawCell(ci, cj, cells[k]);
+    spark(nx, ny, TEAMS[c.idx].ball);
+    c.nomadDir += Math.PI + rand(-0.8, 0.8);   // 反弹+扰动
+    return;
+  }
+  // 己方格子:正常前进
+  c.x = nx; c.y = ny;
+  c.base = Math.atan2(BY+BS/2 - c.y, BX+BS/2 - c.x);   // 炮口朝向随位置更新
+}
+function territory(id){    // 统计某色占领格数(缓存,每帧最多算一次)
+  if(territory._t !== t){
+    territory._t = t; territory._c = [0,0,0,0];
+    for(let k=0;k<cells.length;k++){ const o=cells[k]; if(o>=0) territory._c[o]++; }
+  }
+  return territory._c[id];
+}
 function fireMarble(c){
-  const a = c.aim + rand(-0.06, 0.06), sp = rand(180, 330);
+  const id = c.idx;
+  const a = c.aim + rand(-0.06, 0.06), sp = rand(CFG.spMin[id], CFG.spMax[id]);
+  let hp = CFG.marbleDmg[id];
+  if(c.trait === 'dblhp') hp *= 2;        // 重弹:小球生命翻倍
   marbles.push({ x:c.x+Math.cos(a)*30, y:c.y+Math.sin(a)*30,
-                 vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, c:c.idx });
-  counts[c.idx]++;
+                 vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, c:id, hp });
+  counts[id]++;
+}
+function applyDamage(c, dmg, attacker){   // 统一伤害入口:触发应激护盾特性
+  c.hp -= dmg;
+  if(c.trait === 'dmgshd'){
+    c.dmgTaken += dmg;
+    while(c.dmgTaken >= 50){ c.dmgTaken -= 50; c.shield = Math.max(c.shield, 10);
+      toast('🛡 ' + TEAMS[c.idx].name + ' 应激护盾触发!', TEAMS[c.idx].ball); }
+  }
+  if(c.hp <= 0) onLethal(c, attacker);
 }
 function shielded(c){ return c.shield > 0 || c.shieldHp > 0; }
 function hitShield(c){   // 护盾吸收一次攻击:计时盾免费,否则永久盾扣 1 点
   if(c.shield <= 0 && c.shieldHp > 0) c.shieldHp--;
+}
+const GUARD_RAD = 36;                 // 扇形挡板所在半径(到炮台中心)
+const GUARD_THICK = 4;                // 扇形环厚度(更薄)
+const GUARD_SPAN = Math.PI/2*0.50;    // 每片扇形张角(略小,缝隙更大)
+function guardHit(x, y, atkColor, rad){   // 命中任一敌方存活扇形挡板?
+  for(const cn of cannons){
+    if(!cn.alive || cn.idx === atkColor || !cn.guards.length) continue;
+    const dx=x-cn.x, dy=y-cn.y, dist=Math.hypot(dx,dy);
+    if(dist < GUARD_RAD-GUARD_THICK-rad || dist > GUARD_RAD+GUARD_THICK+rad) continue;
+    const ang = Math.atan2(dy, dx);
+    for(const g of cn.guards){
+      if(!g.alive) continue;
+      let d = Math.abs(norm(ang - g.ang));
+      if(d > Math.PI) d = Math.PI*2 - d;
+      if(d < GUARD_SPAN/2) return true;
+    }
+  }
+  return false;
+}
+// 反弹敌方扇形挡板上的弹体(不破坏);命中并弹开返回 true
+function guardReflect(obj, rad){
+  for(const cn of cannons){
+    if(!cn.alive || cn.idx === obj.c || !cn.guards.length) continue;
+    const dx=obj.x-cn.x, dy=obj.y-cn.y, dist=Math.hypot(dx,dy);
+    if(dist < 1) continue;
+    if(dist < GUARD_RAD-GUARD_THICK-rad || dist > GUARD_RAD+GUARD_THICK+rad) continue;
+    const ang = Math.atan2(dy, dx);
+    for(const g of cn.guards){
+      if(!g.alive) continue;
+      let d = Math.abs(norm(ang - g.ang));
+      if(d > Math.PI) d = Math.PI*2 - d;
+      if(d < GUARD_SPAN/2){
+        const nx=dx/dist, ny=dy/dist;                 // 径向法线
+        const vn=obj.vx*nx + obj.vy*ny;
+        if(vn < 0){ obj.vx -= 2*vn*nx; obj.vy -= 2*vn*ny; }   // 朝内运动时镜面反射
+        const out = GUARD_RAD + GUARD_THICK + rad + 0.5;       // 推回挡板外侧,避免卡入
+        obj.x = cn.x + nx*out; obj.y = cn.y + ny*out;
+        return true;
+      }
+    }
+  }
+  return false;
+}
+const MAGNET_R = 100;        // 磁场作用半径
+const MAGNET_FORCE = 500;  // 磁场推力强度
+// 对一个带 vx/vy 的弹体施加敌方磁场排斥;scale<1 用于削弱大型弹珠
+function applyMagnet(obj, h, scale){
+  for(const cn of cannons){
+    if(!cn.alive || cn.trait !== 'magnet' || cn.idx === obj.c) continue;
+    const dx = obj.x-cn.x, dy = obj.y-cn.y, d = Math.hypot(dx,dy);
+    if(d > MAGNET_R || d < 1) continue;
+    const f = MAGNET_FORCE * scale * (1 - d/MAGNET_R) / d * h;   // 越近越强
+    obj.vx += dx*f; obj.vy += dy*f;
+  }
 }
 function updateMarbles(h){
   // 复活炮台的"清场"延迟处理(避免循环中过滤被覆盖)
@@ -208,17 +472,23 @@ function updateMarbles(h){
     }
   }
   const out = [];
-  const damp = Math.pow(0.95, h);   // 轻微阻力,弹珠无寿命限制
   for(const m of marbles){
     if(!cannons[m.c].alive) continue;   // 已淘汰颜色的弹珠直接清除
-    m.vx *= damp; m.vy *= damp;
+    if(m.hp == null) m.hp = 1;
+    const owner = cannons[m.c];
+    const isPhase = owner.trait === 'phase';
+    if(!isPhase){                       // 相位弹珠无阻力
+      const damp = Math.pow(CFG.damp[m.c], h);
+      m.vx *= damp; m.vy *= damp;
+    }
+    applyMagnet(m, h, 1);               // 敌方磁场排斥(普通弹珠全额)
     const px = m.x, py = m.y;
     m.x += m.vx*h; m.y += m.vy*h;
-    // 撞墙反弹
-    if(m.x < BX+MR){ m.x = BX+MR; m.vx =  Math.abs(m.vx)*0.85; }
-    else if(m.x > BX+BS-MR){ m.x = BX+BS-MR; m.vx = -Math.abs(m.vx)*0.85; }
-    if(m.y < BY+MR){ m.y = BY+MR; m.vy =  Math.abs(m.vy)*0.85; }
-    else if(m.y > BY+BS-MR){ m.y = BY+BS-MR; m.vy = -Math.abs(m.vy)*0.85; }
+    // 撞墙反弹(相位弹珠撞墙有 25% 概率改变角度)
+    if(m.x < BX+MR){ m.x = BX+MR; m.vx =  Math.abs(m.vx)*0.85; if(isPhase) phaseWallKick(m); }
+    else if(m.x > BX+BS-MR){ m.x = BX+BS-MR; m.vx = -Math.abs(m.vx); if(isPhase) phaseWallKick(m); }
+    if(m.y < BY+MR){ m.y = BY+MR; m.vy =  Math.abs(m.vy)*0.85; if(isPhase) phaseWallKick(m); }
+    else if(m.y > BY+BS-MR){ m.y = BY+BS-MR; m.vy = -Math.abs(m.vy); if(isPhase) phaseWallKick(m); }
     // 敌方护盾:碰到即消失(永久护盾同时扣 1 点护盾值)
     let dead = false;
     for(const cn of cannons){
@@ -232,21 +502,39 @@ function updateMarbles(h){
         }
       }
     }
-    // 沿路径检查:碰到第一个非己方格子 → 染色并消失(一珠换一格)
+    // 敌方环卫挡板:反弹弹珠(不破坏)
+    if(!dead && guardReflect(m, MR)){
+      spark(m.x, m.y, TEAMS[m.c].ball);
+    }
+    // 沿路径检查:碰到第一个非己方格子 → 攻击格子(扣血),格子破→染色;弹珠扣血,归零消失
     if(!dead){
       const dx = m.x-px, dy = m.y-py;
       const d = Math.hypot(dx,dy);
       const steps = Math.max(1, Math.ceil(d/(CS*0.7)));
+      let lci=-1, lcj=-1;
       for(let s=1;s<=steps;s++){
         const xx = px + dx*s/steps, yy = py + dy*s/steps;
         const ci = ((xx-BX)/CS)|0, cj = ((yy-BY)/CS)|0;
         if(ci<0 || cj<0 || ci>=N || cj>=N) continue;
+        if(ci===lci && cj===lcj) continue;
+        lci=ci; lcj=cj;
         if(cells[cj*N+ci] !== m.c){
-          paintCell(ci, cj, m.c);
-          spark(xx, yy, TEAMS[m.c].ball);
-          m.x = xx; m.y = yy;
-          dead = true;
-          break;
+          // 弹珠与格子互拼生命值:每点抵消 1 点
+          const cellLife = cellHp[cj*N+ci];
+          if(m.hp >= cellLife){
+            m.hp -= cellLife;
+            setCell(ci, cj, m.c, 1);     // 攻破→翻色,补满 1 血
+            spark(xx, yy, TEAMS[m.c].ball);
+            m.x = xx; m.y = yy;
+            if(m.hp <= 0){ dead = true; break; }
+            // 弹珠还有血:继续往后检测下一格
+          } else {
+            cellHp[cj*N+ci] -= m.hp;     // 弹珠血不够,只削减格子生命
+            drawCell(ci, cj, cells[cj*N+ci]);
+            m.hp = 0; m.x = xx; m.y = yy;
+            dead = true;
+            break;
+          }
         }
       }
     }
@@ -259,21 +547,53 @@ function updateMarbles(h){
           dead = true;
           if(c.dmgCd <= 0){
             c.dmgCd = 0.03;
-            c.hp--;
             spark(m.x, m.y, TEAMS[m.c].ball);
-            if(c.hp <= 0) onLethal(c);
+            applyDamage(c, Math.max(1, m.hp), m.c);
           }
           break;
         }
       }
     }
     const sp2 = m.vx*m.vx + m.vy*m.vy;
-    if(dead || sp2 < 25*25){ counts[m.c]--; continue; }  // 速度归零的死珠兜底清理
+    if(dead || (!isPhase && sp2 < 25*25)){ counts[m.c]--; continue; }  // 相位弹珠不因低速清理
     out.push(m);
   }
   marbles = out;
+  resolvePhaseCollisions();
 }
-function onLethal(c){
+function phaseWallKick(m){
+  if(Math.random() < 0.25){                 // 25% 概率改变角度
+    const sp = Math.hypot(m.vx, m.vy);
+    const a = Math.atan2(m.vy, m.vx) + rand(-0.9, 0.9);
+    m.vx = Math.cos(a)*sp; m.vy = Math.sin(a)*sp;
+  }
+}
+// 相位弹珠可与敌方弹珠碰撞:互相抵消生命,谁先归零谁消失
+function resolvePhaseCollisions(){
+  const phase = [];
+  for(const m of marbles){ if(cannons[m.c].trait === 'phase') phase.push(m); }
+  if(!phase.length) return;
+  const dead = new Set();
+  for(const p of phase){
+    if(dead.has(p)) continue;
+    for(const m of marbles){
+      if(m === p || m.c === p.c || dead.has(m)) continue;
+      const dx=p.x-m.x, dy=p.y-m.y, rr=MR*2;
+      if(dx*dx+dy*dy < rr*rr){
+        // 互拼生命:较小者消失,较大者扣掉对方生命
+        const lo = Math.min(p.hp, m.hp);
+        spark((p.x+m.x)/2, (p.y+m.y)/2, '#fff');
+        p.hp -= lo; m.hp -= lo;
+        if(m.hp <= 0){ dead.add(m); }
+        if(p.hp <= 0){ dead.add(p); break; }
+      }
+    }
+  }
+  if(dead.size){
+    marbles = marbles.filter(m => { if(dead.has(m)){ counts[m.c]--; return false; } return true; });
+  }
+}
+function onLethal(c, attacker){
   if(c.lives > 0){            // 额外生命:复活
     c.lives--;
     c.hp = c.maxHp;           // 继承当前生命上限
@@ -284,6 +604,14 @@ function onLethal(c){
     toast('🔁 ' + TEAMS[c.idx].name + ' 消耗一条生命复活!(剩余 ' + c.lives + ' 条)', TEAMS[c.idx].ball);
   } else {
     eliminate(c);
+    // 击杀奖励:凶手若带"增殖"特性,面板弹珠 +1
+    if(attacker != null && attacker !== c.idx){
+      const k = cannons[attacker];
+      if(k && k.alive && k.trait === 'plinko'){
+        plinkoBalls.push(newPlinkoBall(attacker));
+        toast('☠ ' + TEAMS[attacker].name + ' 击杀奖励:面板弹珠 +1!', TEAMS[attacker].ball);
+      }
+    }
   }
 }
 function eliminate(c){
@@ -296,6 +624,7 @@ function eliminate(c){
   pierceBalls = pierceBalls.filter(p => p.c !== c.idx);
   bombBalls = bombBalls.filter(b => b.c !== c.idx);
   nukeBalls = nukeBalls.filter(b => b.c !== c.idx);
+  homingBalls = homingBalls.filter(b => b.c !== c.idx);
   ultraBalls = ultraBalls.filter(b => b.c !== c.idx);
   shockwaves = shockwaves.filter(w => w.c !== c.idx);
   counts[c.idx] = 0;
@@ -314,10 +643,10 @@ function checkWin(h){
    ============================================================ */
 const PX=14, PY=14, PW=336, PH=690, SLOT_H=46, PBR=7;
 const SLOT_RAMP = 360;   // RELEASE→MULTIPLY 宽度过渡所需秒数
-// 槽位边界:开局 RELEASE/MULTIPLY 各 0.40,随时间过渡到 0.13/0.67(=1:5),SPIN 固定 0.20
+// 槽位边界:开局 RELEASE/MULTIPLY 各 0.40,随时间过渡到 0.16/0.64(=1:4),SPIN 固定 0.20
 function slotBounds(){
   const k = Math.min(1, t/SLOT_RAMP);
-  const rel = 0.40 + (0.13 - 0.40)*k;
+  const rel = 0.40 + (0.16 - 0.40)*k;
   return [rel, 0.80];
 }
 const pegs = [];
@@ -373,8 +702,9 @@ function slotEffect(ci, slot){
     toast(tm.name + ' 弹药 ×2 → ' + fmt(c.ammo), tm.ball);
     flash(1);
   } else if(slot === 0){                            // RELEASE:全部发射
-    const n = c.ammo;
-    c.queue += n; c.ammo = 1;
+    const ratio = (c.trait === 'dblhp') ? 0.5 : 1;  // 重弹:转换比率 0.5
+    const n = Math.floor(c.ammo * ratio);
+    c.queue += n; c.ammo = c.baseAmmo;
     toast(tm.name + ' 发射 ' + fmt(n) + ' 发!', tm.ball);
     flash(0);
   } else {                                          // SPIN:进入技能转盘
@@ -393,22 +723,12 @@ function flash(slot){ flashes.push({slot, t:0.35}); }
    ============================================================ */
 const WX=1408, WY=205, WR=150, IR=106, SEG=Math.PI*2/8;
 const GAP_HALF = 0.30;   // 内圈挡板底部缺口的半宽(弧度)
-const STAR_SEG_START = 0.16;   // ★ 初始大小
-const STAR_SEG_END   = 0.35;   // ★ 最终大小
-const STAR_SEG_RAMP  = 360;    // 变宽所需时间，单位秒，和 SLOT_RAMP 一样
-
-function smallSeg(){
-  const k = Math.min(1, t / STAR_SEG_RAMP);
-  return STAR_SEG_START + (STAR_SEG_END - STAR_SEG_START) * k;
-}
-
-function bigSeg(){
-  return (Math.PI * 2 - smallSeg()) / 8;// 8 个常规技能扇区
-}
+const SMALL_SEG = 0.16;                      // ★ 小扇区(进入终极转盘的入口)
+const BIG_SEG = (Math.PI*2 - SMALL_SEG)/9;   // 9 个常规技能扇区
 // ---- 终极技能转盘(下方,结构与上方相同)----
-const WX2 = WX, WY2 = 570, SEG2 = Math.PI*2/6;
-const ULT_LABELS = ['+弹珠','上限+50','盾100','×10','+1命','核弹'];
-const LABELS = ['+1','护盾','×4','偷取','炸弹','贯穿','回血','上限+10'];
+const WX2 = WX, WY2 = 570, SEG2 = Math.PI*2/7;
+const ULT_LABELS = ['+弹珠','上限+50','盾100','×10','+1命','核弹','底弹+1'];
+const LABELS = ['+1','护盾','×4','偷取','炸弹','贯穿','回血','上限+10','追踪弹'];
 const PEG_OMEGA = -0.9;   // 内圈节点旋转角速度(与技能环反向,搅动小球)
 const wheelPegs = [];
 (function(){
@@ -490,13 +810,12 @@ function updateWheel(h){
 }
 function triggerSkill(b, ang){
   const rel = norm(ang - theta);
-  const bs = bigSeg();
-  if(rel >= 8*bs){                  // ★ 小扇区:小球进入下方终极转盘
-    segFlashes.push({ s:8, t:0.8, col:TEAMS[b.c].ball });
+  if(rel >= 9*BIG_SEG){                  // ★ 小扇区:小球进入下方终极转盘
+    segFlashes.push({ s:9, t:0.8, col:TEAMS[b.c].ball });
     enterUltimate(b);
     return;
   }
-  const s = Math.min(7, Math.floor(rel/bs));    // 落点所在扇区
+  const s = Math.min(8, Math.floor(rel/BIG_SEG));    // 落点所在扇区
   const c = cannons[b.c];
   const tm = TEAMS[b.c];
   segFlashes.push({ s, t:0.8, col:tm.ball });
@@ -520,29 +839,29 @@ function triggerSkill(b, ang){
       toast('✨ ' + tm.name + ' 弹药 ×4 → ' + fmt(c.ammo), tm.ball);
       break;
     }
-    case 3: {  // 偷取:夺走弹药最多的对手一半弹药
+    case 3: {  // 偷取:夺走待发弹药最多的对手一半待发弹药
       let victim = null;
       for(const o of cannons){
         if(!o.alive || o.idx === c.idx) continue;
-        if(!victim || o.ammo > victim.ammo) victim = o;
+        if(!victim || o.queue > victim.queue) victim = o;
       }
-      if(victim && victim.ammo > 1){
-        const n = Math.floor(victim.ammo/2);
-        victim.ammo -= n;
-        c.ammo = Math.min(AMMO_CAP, c.ammo + n);
-        toast('🕳 ' + tm.name + ' 偷走 ' + TEAMS[victim.idx].name + ' ' + fmt(n) + ' 弹药!', tm.ball);
+      if(victim && victim.queue > 1){
+        const n = Math.floor(victim.queue/2);
+        victim.queue -= n;
+        c.queue += n;
+        toast('🕳 ' + tm.name + ' 偷走 ' + TEAMS[victim.idx].name + ' ' + fmt(n) + ' 待发弹药!', tm.ball);
       } else {
-        toast(tm.name + ' 偷取落空:对手没有可偷的弹药', tm.ball);
+        toast(tm.name + ' 偷取落空:对手没有可偷的待发弹药', tm.ball);
       }
       break;
     }
     case 4:    // 炸弹:发射炸弹弹珠,碰到不同颜色区域时爆炸
       fireBomb(c);
       break;
-    case 5: {  // 贯穿弹:消耗一半弹药,生命值 = 消耗量
-      const n = Math.floor(c.ammo/2);
-      if(n < 1){ toast(tm.name + ' 弹药不足,贯穿弹未能发射', tm.ball); break; }
-      c.ammo -= n;
+    case 5: {  // 贯穿弹:生命值 = 待发弹药 10%
+      const n = Math.max(1, Math.floor(c.queue*0.10));
+      if(c.queue < 1){ toast(tm.name + ' 无待发弹药,贯穿弹未能发射', tm.ball); break; }
+      c.queue = Math.max(0, c.queue - n);
       const a = c.aim;
       pierceBalls.push({ x:c.x+Math.cos(a)*36, y:c.y+Math.sin(a)*36,
                          vx:Math.cos(a)*140, vy:Math.sin(a)*140, c:c.idx, hp:n });
@@ -557,6 +876,9 @@ function triggerSkill(b, ang){
       c.maxHp += 10;
       toast('❤ ' + tm.name + ' 生命上限 +10 → ' + c.maxHp, tm.ball);
       break;
+    case 8:    // 追踪弹:缓慢移动+转向,生命 = 弹药 10%
+      fireHoming(c);
+      break;
   }
 }
 
@@ -567,7 +889,7 @@ function enterUltimate(b){
   toast('🌟 ' + TEAMS[b.c].name + ' 进入终极转盘!', TEAMS[b.c].ball);
 }
 function updateUltimate(h){
-  theta2 += h*0.90;
+  theta2 += h*0.55;
   for(const fl of segFlashes2) fl.t -= h;
   segFlashes2 = segFlashes2.filter(fl => fl.t > 0);
   const out = [];
@@ -619,7 +941,7 @@ function updateUltimate(h){
   ultraBalls = out;
 }
 function ultimateSkill(b, ang){
-  const s = Math.floor(norm(ang - theta2)/SEG2) % 6;
+  const s = Math.floor(norm(ang - theta2)/SEG2) % 7;
   const c = cannons[b.c];
   const tm = TEAMS[b.c];
   segFlashes2.push({ s, t:0.8, col:tm.ball });
@@ -649,6 +971,11 @@ function ultimateSkill(b, ang){
     case 5:    // 核弹
       fireNuke(c);
       break;
+    case 6:    // 最初弹药 +1(RELEASE 后的底数累加)
+      c.baseAmmo++;
+      c.ammo = Math.max(c.ammo, c.baseAmmo);
+      toast('🌟 ' + tm.name + ' 最初弹药 +1 → 底数 ' + c.baseAmmo, tm.ball);
+      break;
   }
 }
 
@@ -663,6 +990,7 @@ function updateBombs(h){
   const out = [];
   for(const b of bombBalls){
     if(b.dead || !cannons[b.c].alive) continue;
+    applyMagnet(b, h, 0.5);   // 大型弹珠磁场减半
     const px0 = b.x, py0 = b.y;
     b.x += b.vx*h; b.y += b.vy*h;
     // 撞墙反弹(不减速)
@@ -727,9 +1055,101 @@ function bombAt(ci, tx, ty){
       if(dx*dx+dy*dy < R*R) ob.dead = true;
     }
   }
+  homingBalls = homingBalls.filter(b => {
+    if(b.c !== ci){ const dx=b.x-bx, dy=b.y-by; if(dx*dx+dy*dy < R*R) return false; }
+    return true;
+  });
   explosion(bx, by, TEAMS[ci].ball, 110, 520);
   waves.push({ x:bx, y:by, r:0, max:R+30, col:TEAMS[ci].ball });
   toast('💣 ' + TEAMS[ci].name + ' 炸弹爆炸!', TEAMS[ci].ball);
+}
+
+/* ---------- 技能:追踪弹 ---------- */
+const HOMING_SPEED = 50;       // 移速(慢)
+const HOMING_TURN = 0.5;       // 转向速率(弧度/秒)
+const HBR = 9;                 // 追踪弹半径
+function fireHoming(c){
+  const n = Math.max(1, Math.floor(c.queue*0.10));  // 生命 = 待发弹药 10%
+  const a = c.aim;
+  homingBalls.push({ x:c.x+Math.cos(a)*36, y:c.y+Math.sin(a)*36, dir:a, c:c.idx, hp:n });
+  toast('🎯 ' + TEAMS[c.idx].name + ' 发射追踪弹 (HP ' + fmt(n) + ')!', TEAMS[c.idx].ball);
+}
+function updateHoming(h){
+  const out = [];
+  for(const b of homingBalls){
+    if(!cannons[b.c].alive) continue;
+    if(b.hp <= 0) continue;
+    // 找最近的敌方存活炮台
+    let tgt=null, best=1e18;
+    for(const cn of cannons){
+      if(!cn.alive || cn.idx === b.c) continue;
+      const dx=cn.x-b.x, dy=cn.y-b.y, d=dx*dx+dy*dy;
+      if(d < best){ best=d; tgt=cn; }
+    }
+    if(tgt){
+      const want = Math.atan2(tgt.y-b.y, tgt.x-b.x);
+      let diff = norm(want - b.dir); if(diff > Math.PI) diff -= Math.PI*2;
+      const turn = Math.max(-HOMING_TURN*h, Math.min(HOMING_TURN*h, diff));
+      b.dir += turn;
+    }
+    const px0=b.x, py0=b.y;
+    b.x += Math.cos(b.dir)*HOMING_SPEED*h;
+    b.y += Math.sin(b.dir)*HOMING_SPEED*h;
+    // 边界反弹
+    if(b.x < BX+HBR){ b.x=BX+HBR; b.dir=Math.PI-b.dir; }
+    else if(b.x > BX+BS-HBR){ b.x=BX+BS-HBR; b.dir=Math.PI-b.dir; }
+    if(b.y < BY+HBR){ b.y=BY+HBR; b.dir=-b.dir; }
+    else if(b.y > BY+BS-HBR){ b.y=BY+BS-HBR; b.dir=-b.dir; }
+    let dead=false;
+    // 敌方护盾:扣 1 并消耗护盾
+    for(const cn of cannons){
+      if(cn.alive && shielded(cn) && cn.idx !== b.c){
+        const dx=b.x-cn.x, dy=b.y-cn.y;
+        if(dx*dx+dy*dy < (SHIELD_R+HBR)*(SHIELD_R+HBR)){
+          hitShield(cn); b.hp -= Math.ceil(b.hp/2); spark(b.x,b.y,TEAMS[b.c].ball);   // 撞护盾扣当前一半血
+          if(b.hp<=0) dead=true;
+          const d=Math.hypot(dx,dy)||1; b.dir=Math.atan2(dy/d,dx/d);   // 弹开
+          break;
+        }
+      }
+    }
+    // 敌方挡板
+    if(!dead && guardHit(b.x, b.y, b.c, HBR)){ b.hp--; spark(b.x,b.y,TEAMS[b.c].ball); if(b.hp<=0) dead=true; }
+    // 啃格子(与贯穿弹同逻辑)
+    if(!dead){
+      const dx=b.x-px0, dy=b.y-py0, d=Math.hypot(dx,dy);
+      const steps=Math.max(1,Math.ceil(d/(CS*0.7)));
+      let lci=-1,lcj=-1;
+      for(let st=1;st<=steps;st++){
+        const xx=px0+dx*st/steps, yy=py0+dy*st/steps;
+        const ci=((xx-BX)/CS)|0, cj=((yy-BY)/CS)|0;
+        if(ci<0||cj<0||ci>=N||cj>=N) continue;
+        if(ci===lci&&cj===lcj) continue; lci=ci; lcj=cj;
+        if(cells[cj*N+ci] !== b.c){
+          const cl=cellHp[cj*N+ci];
+          if(b.hp>=cl){ b.hp-=cl; setCell(ci,cj,b.c,1); }
+          else { cellHp[cj*N+ci]-=b.hp; drawCell(ci,cj,cells[cj*N+ci]); b.hp=0; }
+          if(b.hp<=0){ dead=true; break; }
+        }
+      }
+    }
+    // 命中炮台:造成剩余生命伤害
+    if(!dead){
+      for(const cn of cannons){
+        if(!cn.alive || cn.idx===b.c || shielded(cn)) continue;
+        const dx=b.x-cn.x, dy=b.y-cn.y;
+        if(dx*dx+dy*dy < (28+HBR)*(28+HBR)){
+          explosion(b.x,b.y,TEAMS[b.c].ball,40,300);
+          toast('🎯 追踪弹命中 ' + TEAMS[cn.idx].name + ' (-' + fmt(b.hp) + ' HP)', TEAMS[b.c].ball);
+          applyDamage(cn, b.hp, b.c);
+          dead=true; break;
+        }
+      }
+    }
+    if(dead) continue;
+    out.push(b);
+  }
+  homingBalls = out;
 }
 
 /* ---------- 终极技能:核弹 ---------- */
@@ -743,6 +1163,7 @@ function updateNukes(h){
   const out = [];
   for(const b of nukeBalls){
     if(b.dead || !cannons[b.c].alive) continue;
+    applyMagnet(b, h, 0.5);   // 大型弹珠磁场减半
     const px0 = b.x, py0 = b.y;
     b.x += b.vx*h; b.y += b.vy*h;
     if(b.x < BX+NBR){ b.x = BX+NBR; b.vx =  Math.abs(b.vx); }
@@ -802,6 +1223,10 @@ function updateShockwaves(h){
         if(dx*dx+dy*dy < r2) ob.dead = true;
       }
     }
+    homingBalls = homingBalls.filter(b => {
+      if(b.c !== w.c){ const dx=b.x-w.x, dy=b.y-w.y; if(dx*dx+dy*dy < r2) return false; }
+      return true;
+    });
     if(w.r < NUKE_R) out.push(w);
   }
   shockwaves = out;
@@ -829,7 +1254,7 @@ function updatePierce(h){
           p.x = cn.x+nx*rr; p.y = cn.y+ny*rr;
           const dot = p.vx*nx + p.vy*ny;
           if(dot < 0){ p.vx -= 2*dot*nx; p.vy -= 2*dot*ny; }
-          p.hp--;
+          p.hp -= Math.ceil(p.hp/2);   // 撞护盾扣当前一半血
           hitShield(cn);
           spark(p.x, p.y, TEAMS[p.c].ball);
           if(p.hp <= 0) dead = true;
@@ -842,32 +1267,32 @@ function updatePierce(h){
         if(!cn.alive || cn.idx === p.c || shielded(cn)) continue;
         const dx=p.x-cn.x, dy=p.y-cn.y;
         if(dx*dx+dy*dy < (28+PR)*(28+PR)){
-          cn.hp -= p.hp;
           explosion(p.x, p.y, TEAMS[p.c].ball, 40, 300);
           toast('💥 贯穿弹命中 ' + TEAMS[cn.idx].name + ' (-' + fmt(p.hp) + ' HP)', TEAMS[p.c].ball);
-          if(cn.hp <= 0) onLethal(cn);
+          applyDamage(cn, p.hp, p.c);
           dead = true;
           break;
         }
       }
     }
-    // 沿路径啃格子:每染一格生命-1
+    // 沿路径啃格子:每点格子生命消耗 1 点贯穿弹生命
     if(!dead){
       const dx=p.x-px0, dy=p.y-py0, d=Math.hypot(dx,dy);
       const steps = Math.max(1, Math.ceil(d/(CS*0.7)));
+      let lci=-1,lcj=-1;
       for(let s=1;s<=steps;s++){
         const xx = px0 + dx*s/steps, yy = py0 + dy*s/steps;
         const ci = ((xx-BX)/CS)|0, cj = ((yy-BY)/CS)|0;
         if(ci<0 || cj<0 || ci>=N || cj>=N) continue;
+        if(ci===lci&&cj===lcj) continue; lci=ci; lcj=cj;
         if(cells[cj*N+ci] !== p.c){
-          paintCell(ci, cj, p.c);
-          p.hp--;
-          if(p.hp <= 0){
-            p.x = xx; p.y = yy;
-            spark(xx, yy, TEAMS[p.c].ball);
-            dead = true;
-            break;
+          const cellLife = cellHp[cj*N+ci];
+          if(p.hp >= cellLife){
+            p.hp -= cellLife; setCell(ci, cj, p.c, 1);
+          } else {
+            cellHp[cj*N+ci] -= p.hp; drawCell(ci,cj,cells[cj*N+ci]); p.hp = 0;
           }
+          if(p.hp <= 0){ p.x = xx; p.y = yy; spark(xx, yy, TEAMS[p.c].ball); dead = true; break; }
         }
       }
     }
@@ -935,6 +1360,7 @@ function render(){
   drawPierce();
   drawBombs();
   drawNukes();
+  drawHoming();
   for(const c of cannons) drawCannon(c);
   drawWaves();
   drawShockwaves();
@@ -997,6 +1423,27 @@ function drawNukes(){
     ctx.font = 'bold 12px Verdana';
     ctx.textAlign = 'center';
     ctx.fillText('☢', b.x, b.y+4);
+  }
+  ctx.textAlign = 'left';
+}
+function drawHoming(){
+  for(const b of homingBalls){
+    if(b.hp <= 0) continue;
+    const tm = TEAMS[b.c];
+    // 箭头朝向 dir
+    ctx.save();
+    ctx.translate(b.x, b.y); ctx.rotate(b.dir);
+    ctx.fillStyle = tm.ball;
+    ctx.beginPath();
+    ctx.moveTo(HBR+3, 0); ctx.lineTo(-HBR, HBR*0.8); ctx.lineTo(-HBR*0.4, 0); ctx.lineTo(-HBR, -HBR*0.8);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.restore();
+    // 生命值
+    ctx.font = 'bold 12px Verdana'; ctx.textAlign = 'center';
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
+    ctx.strokeText(fmt(b.hp), b.x, b.y - HBR - 5);
+    ctx.fillStyle = '#fff'; ctx.fillText(fmt(b.hp), b.x, b.y - HBR - 5);
   }
   ctx.textAlign = 'left';
 }
@@ -1074,6 +1521,29 @@ function drawCannon(c){
   ctx.fillRect(c.x-26, c.y-38, 52, 7);
   ctx.fillStyle = c.hp > c.maxHp*0.3 ? '#5be05b' : '#ff5050';
   ctx.fillRect(c.x-25, c.y-37, 50*Math.max(0,c.hp)/c.maxHp, 5);
+  // 环卫挡板:扇形环状
+  if(c.guards.length){
+    for(const g of c.guards){
+      if(!g.alive) continue;
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, GUARD_RAD+GUARD_THICK, g.ang-GUARD_SPAN/2, g.ang+GUARD_SPAN/2);
+      ctx.arc(c.x, c.y, GUARD_RAD-GUARD_THICK, g.ang+GUARD_SPAN/2, g.ang-GUARD_SPAN/2, true);
+      ctx.closePath();
+      ctx.fillStyle = shade(tm.ball, -0.1);
+      ctx.fill();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+    }
+  }
+  // 磁场:脉动虚线圈
+  if(c.trait === 'magnet'){
+    ctx.save();
+    ctx.globalAlpha = 0.30 + 0.12*Math.sin(t*4);
+    ctx.strokeStyle = tm.ball; ctx.lineWidth = 2;
+    ctx.setLineDash([6, 8]);
+    ctx.beginPath(); ctx.arc(c.x, c.y, MAGNET_R*(0.7+0.06*Math.sin(t*3)), 0, 6.283); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
 }
 function drawHUD(){
   const pos = [
@@ -1088,9 +1558,9 @@ function drawHUD(){
     ctx.fillStyle = tm.ball;
     ctx.font = 'bold 24px Verdana, sans-serif';
     if(!c.alive){ ctx.fillText(tm.name + ' 已淘汰', p.x, p.y+13); continue; }
-    ctx.fillText('HP:' + c.hp + '/' + c.maxHp + (c.lives > 0 ? '  \u2665\u00d7' + c.lives : ''), p.x, p.y);
-    ctx.font = 'bold 19px Verdana, sans-serif';
-    ctx.fillText(fmt(c.ammo) + ' 弹药 · ' + fmt(counts[i]+c.queue) + ' 弹珠', p.x, p.y+26);
+    ctx.fillText('HP:' + c.hp + '/' + c.maxHp + (c.lives > 0 ? '  ♥×' + c.lives : '') + '  特性:' + TRAITS[c.trait].name, p.x, p.y);
+    ctx.font = 'bold 18px Verdana, sans-serif';
+    ctx.fillText(fmt(c.ammo) + ' 弹药 · 待发 ' + fmt(c.queue), p.x, p.y+24);
   }
   ctx.textAlign = 'left';
 }
@@ -1122,6 +1592,19 @@ function drawPlinko(){
     ctx.fillStyle = TEAMS[b.c].ball;
     ctx.beginPath(); ctx.arc(b.x, b.y, PBR, 0, 6.283); ctx.fill();
   }
+  // 面板各色弹珠数,显示在面板下方
+  const cnt=[0,0,0,0];
+  for(const b of plinkoBalls) cnt[b.c]++;
+  ctx.font = 'bold 13px Verdana'; ctx.textAlign = 'left';
+  let lx = PX-2; const ly = PY+PH+18;
+  ctx.fillStyle = '#999'; ctx.fillText('面板弹珠:', lx, ly); lx += 70;
+  for(let i=0;i<4;i++){
+    if(!cannons[i] || !cannons[i].alive) continue;
+    ctx.fillStyle = TEAMS[i].ball;
+    const txt = cnt[i] + '';
+    ctx.beginPath(); ctx.arc(lx+5, ly-4, 5, 0, 6.283); ctx.fill();
+    ctx.fillText(txt, lx+14, ly); lx += 22 + txt.length*8;
+  }
   ctx.textAlign = 'left';
 }
 function drawWheel(){
@@ -1129,18 +1612,16 @@ function drawWheel(){
   ctx.fillStyle = '#0d0d10';
   ctx.beginPath(); ctx.arc(WX, WY, WR+30, 0, 6.283); ctx.fill();
   ctx.strokeStyle = '#2a2a30'; ctx.lineWidth = 2; ctx.stroke();
-  // 旋转的技能圆环(8 常规扇区 + 1 个 ★ 小扇区)
-  const ss = smallSeg();
-  const bs = bigSeg();
-  for(let s=0;s<9;s++){
-    const a0 = theta + Math.min(s,8) * bs;
-    const a1 = s < 8 ? a0 + bs : theta + Math.PI*2;
+  // 旋转的技能圆环(9 常规扇区 + 1 个 ★ 小扇区)
+  for(let s=0;s<10;s++){
+    const a0 = theta + Math.min(s,9)*BIG_SEG;
+    const a1 = s < 9 ? a0 + BIG_SEG : theta + Math.PI*2;
     const fl = segFlashes.find(f => f.s === s);
     if(fl){
       ctx.globalAlpha = Math.min(1, fl.t/0.4);
       ctx.fillStyle = fl.col;
-    } else if(s === 8){
-      ctx.fillStyle = '#8a6b14';
+    } else if(s === 9){
+      ctx.fillStyle = '#8a6b14';            // ★ 终极入口:金色
     } else {
       ctx.fillStyle = s%2 ? '#17171c' : '#0e0e12';
     }
@@ -1150,19 +1631,21 @@ function drawWheel(){
     ctx.closePath();
     ctx.fill();
     ctx.globalAlpha = 1;
+    // 扇区分隔线
     ctx.strokeStyle = '#3a3a42'; ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(WX+Math.cos(a0)*IR, WY+Math.sin(a0)*IR);
     ctx.lineTo(WX+Math.cos(a0)*WR, WY+Math.sin(a0)*WR);
     ctx.stroke();
+    // 技能标签
     const am = (a0+a1)/2, lr = (IR+WR)/2;
     ctx.save();
     ctx.translate(WX+Math.cos(am)*lr, WY+Math.sin(am)*lr);
     ctx.rotate(am + Math.PI/2);
-    ctx.fillStyle = s === 8 ? '#ffe27a' : '#e8e8e8';
-    ctx.font = s === 8 ? 'bold 10px Verdana' : 'bold 12px Verdana';
+    ctx.fillStyle = s === 9 ? '#ffe27a' : '#e8e8e8';
+    ctx.font = s === 9 ? 'bold 10px Verdana' : 'bold 10px Verdana';
     ctx.textAlign = 'center';
-    ctx.fillText(s === 8 ? '★' : LABELS[s], 0, 4);
+    ctx.fillText(s === 9 ? '★' : LABELS[s], 0, 4);
     ctx.restore();
   }
   // 外缘
@@ -1197,7 +1680,7 @@ function drawUltimate(){
   ctx.fillStyle = '#0d0d10';
   ctx.beginPath(); ctx.arc(WX2, WY2, WR+30, 0, 6.283); ctx.fill();
   ctx.strokeStyle = '#6b5a1f'; ctx.lineWidth = 2; ctx.stroke();
-  for(let s=0;s<6;s++){
+  for(let s=0;s<7;s++){
     const a0 = theta2 + s*SEG2, a1 = a0 + SEG2;
     const fl = segFlashes2.find(f => f.s === s);
     if(fl){
@@ -1288,7 +1771,7 @@ function drawOver(){
   }
   ctx.fillStyle = '#fff';
   ctx.font = 'bold 26px Verdana';
-  ctx.fillText('点击画面或"重新开始"按钮再来一局', 800, 490);
+  ctx.fillText('点击画面重新选择炮台,或按"重新开始"再来一局', 800, 490);
   ctx.textAlign = 'left';
 }
 
@@ -1301,6 +1784,7 @@ function step(h){
     updatePierce(h);
     updateBombs(h);
     updateNukes(h);
+    updateHoming(h);
     updateShockwaves(h);
     updatePlinko(h);
     updateWheel(h);
@@ -1338,16 +1822,121 @@ btnPause.onclick = () => {
   paused = !paused;
   btnPause.textContent = paused ? '▶ 继续' : '⏸ 暂停';
 };
-document.getElementById('btnReset').onclick = () => reset();
+document.getElementById('btnReset').onclick = () => { reset(); paused=false; btnPause.textContent='⏸ 暂停'; };
 document.querySelectorAll('.sp').forEach(b => {
   b.onclick = () => {
     SPEED = +b.dataset.s;
     document.querySelectorAll('.sp').forEach(x => x.classList.toggle('active', x === b));
   };
 });
-cv.addEventListener('click', () => { if(gameOver) reset(); });
+cv.addEventListener('click', () => { if(gameOver) openSetup(); });
+
+/* ---------- 开局选择界面 ---------- */
+const setupEl = document.getElementById('setup');
+const setupGrid = document.getElementById('setupGrid');
+let setupTrait = CFG.trait.slice();
+function buildSetup(){
+  setupGrid.innerHTML = '';
+  for(let i=0;i<4;i++){
+    const tm = TEAMS[i];
+    const card = document.createElement('div');
+    card.className = 'teamCard';
+    card.style.borderColor = tm.ball;
+    const row = TRAIT_KEYS.map(k =>
+      '<button class="traitBtn'+(setupTrait[i]===k?' sel':'')+'" data-team="'+i+'" data-key="'+k+'">'+TRAITS[k].name+'</button>'
+    ).join('');
+    card.innerHTML =
+      '<h4><span class="dot" style="background:'+tm.ball+'"></span>'+tm.name+'炮台</h4>'+
+      '<div class="traitRow">'+row+'</div>'+
+      '<div class="traitDesc" id="desc'+i+'">'+TRAITS[setupTrait[i]].desc+'</div>';
+    setupGrid.appendChild(card);
+  }
+  setupGrid.querySelectorAll('.traitBtn').forEach(b => {
+    b.onclick = () => {
+      const ti = +b.dataset.team, key = b.dataset.key;
+      setupTrait[ti] = key;
+      setupGrid.querySelectorAll('.traitBtn[data-team="'+ti+'"]').forEach(x =>
+        x.classList.toggle('sel', x.dataset.key === key));
+      document.getElementById('desc'+ti).textContent = TRAITS[key].desc;
+    };
+  });
+}
+function openSetup(){ setupTrait = CFG.trait.slice(); buildSetup(); setupEl.classList.remove('hidden'); paused = true; }
+document.getElementById('btnSetup').onclick = openSetup;
+document.getElementById('btnStart').onclick = () => {
+  CFG.trait = setupTrait.slice();
+  setupEl.classList.add('hidden');
+  reset(); paused = false; btnPause.textContent = '⏸ 暂停';
+};
+
+/* ---------- 调试面板 ---------- */
+const debugEl = document.getElementById('debug');
+const dbgBody = document.getElementById('dbgBody');
+function field(label, val, min, max, stepv, oninput, fmtFn){
+  const wrap = document.createElement('div'); wrap.className = 'dbgField';
+  const lb = document.createElement('label'); lb.textContent = label;
+  const rg = document.createElement('input'); rg.type='range';
+  rg.min=min; rg.max=max; rg.step=stepv; rg.value=val;
+  const vv = document.createElement('span'); vv.className='val';
+  const show = v => (fmtFn?fmtFn(v):v);
+  vv.textContent = show(+val);
+  rg.oninput = () => { vv.textContent = show(+rg.value); oninput(+rg.value); };
+  wrap.append(lb, rg, vv); return wrap;
+}
+function buildDebug(){
+  dbgBody.innerHTML = '';
+  for(let i=0;i<4;i++){
+    const c = cannons[i], tm = TEAMS[i];
+    const det = document.createElement('details'); det.className='dbgTeam';
+    if(i===0) det.open = true;
+    const sum = document.createElement('summary');
+    sum.innerHTML = '<span class="dot" style="background:'+tm.ball+'"></span>'+tm.name+'炮台';
+    det.appendChild(sum);
+    // 特性下拉
+    const fr = document.createElement('div'); fr.className='dbgField';
+    const fl = document.createElement('label'); fl.textContent='专属特性';
+    const sel = document.createElement('select');
+    for(const k of TRAIT_KEYS){ const op=document.createElement('option');
+      op.value=k; op.textContent=TRAITS[k].name; if(c.trait===k)op.selected=true; sel.appendChild(op); }
+    sel.onchange = () => { c.trait = sel.value; CFG.trait[i]=sel.value; initTrait(c); };
+    fr.append(fl, sel); det.appendChild(fr);
+    // 实时状态
+    det.appendChild(field('生命值', c.hp, 0, 2000, 1, v=>{ c.hp=v; }));
+    det.appendChild(field('生命上限', c.maxHp, 10, 2000, 5, v=>{ c.maxHp=v; if(c.hp>v)c.hp=v; }));
+    det.appendChild(field('计时护盾(秒)', c.shield|0, 0, 60, 1, v=>{ c.shield=v; }));
+    det.appendChild(field('永久护盾值', c.shieldHp, 0, 2000, 10, v=>{ c.shieldHp=v; }));
+    det.appendChild(field('额外生命', c.lives, 0, 20, 1, v=>{ c.lives=v; }));
+    det.appendChild(field('最初弹药底数', c.baseAmmo, 1, 10000, 1, v=>{ c.baseAmmo=v; }, fmt));
+    det.appendChild(field('弹药', c.ammo, 0, 100000, 100, v=>{ c.ammo=v; }, fmt));
+    det.appendChild(field('待发子弹', c.queue, 0, 100000, 100, v=>{ c.queue=v; }, fmt));
+    det.appendChild(field('炮弹速度↓', CFG.spMin[i], 20, 800, 10, v=>{ CFG.spMin[i]=v; if(CFG.spMax[i]<v)CFG.spMax[i]=v; }));
+    det.appendChild(field('炮弹速度↑', CFG.spMax[i], 20, 800, 10, v=>{ CFG.spMax[i]=v; if(CFG.spMin[i]>v)CFG.spMin[i]=v; }));
+    det.appendChild(field('阻力(保留/s)', CFG.damp[i], 0.80, 1.00, 0.005, v=>{ CFG.damp[i]=v; }, v=>v.toFixed(3)));
+    det.appendChild(field('摆动幅度', CFG.swing[i], 0, 3.14, 0.05, v=>{ CFG.swing[i]=v; }, v=>v.toFixed(2)));
+    det.appendChild(field('射速上限', CFG.fireRateMax[i], 10, 2000, 10, v=>{ CFG.fireRateMax[i]=v; }));
+    det.appendChild(field('弹珠伤害', CFG.marbleDmg[i], 1, 100, 1, v=>{ CFG.marbleDmg[i]=v; }));
+    // 面板弹珠数(增减)
+    const pr = document.createElement('div'); pr.className='dbgField';
+    const pl = document.createElement('label'); pl.textContent='面板弹珠数';
+    const minus=document.createElement('button'); minus.textContent='−'; minus.style.cssText='padding:2px 12px;';
+    const cnt=document.createElement('span'); cnt.className='val';
+    const plus=document.createElement('button'); plus.textContent='+'; plus.style.cssText='padding:2px 12px;';
+    const refresh=()=>{ cnt.textContent = plinkoBalls.reduce((a,b)=>a+(b.c===i?1:0),0); };
+    minus.onclick=()=>{ const idx=plinkoBalls.findIndex(b=>b.c===i); if(idx>=0)plinkoBalls.splice(idx,1); refresh(); };
+    plus.onclick=()=>{ plinkoBalls.push(newPlinkoBall(i)); refresh(); };
+    pr.append(pl, minus, cnt, plus); refresh(); det.appendChild(pr);
+    dbgBody.appendChild(det);
+  }
+}
+document.getElementById('btnDebug').onclick = () => { buildDebug(); debugEl.classList.remove('hidden'); };
+document.getElementById('dbgClose').onclick = () => debugEl.classList.add('hidden');
+debugEl.onclick = (e) => { if(e.target===debugEl) debugEl.classList.add('hidden'); };
+document.getElementById('dbgHealAll').onclick = () => { for(const c of cannons) c.hp=c.maxHp; buildDebug(); };
+document.getElementById('dbgAmmo1k').onclick = () => { for(const c of cannons) c.ammo+=1000; buildDebug(); };
+document.getElementById('dbgClearMarbles').onclick = () => { marbles=[]; counts=[0,0,0,0]; };
 
 reset();
+openSetup();              // 开局先弹出选择界面(此时已暂停)
 requestAnimationFrame(frame);
 </script>
 </body>
