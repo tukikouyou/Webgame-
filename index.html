@@ -119,17 +119,31 @@
 <script>
 'use strict';
 /* ============================================================
-   弹珠领土战争 —— 三个功能区:
-   1) 主战场:四角炮台 + 染色格子地面 + 血量淘汰
-   2) 左上弹珠面板:RELEASE / MULTIPLY / SPIN
-   3) 右上技能转盘:旋转缺口,掉出触发技能(弹药×4)
+   弹珠领土战争 — 单文件 Canvas 游戏
+   ------------------------------------------------------------
+   【文件导航】(按出现顺序,搜索括号内关键字可直接跳转)
+     [配置]      画布/常量/队伍/特性表/CFG/工具函数         §CONFIG
+     [格子]      离屏战场画布,drawCell/setCell/paintCell    §GRID
+     [状态]      全局状态变量 + reset() 初始化               §STATE
+     [功能区1]   主战场:炮台行为/弹珠物理/伤害/淘汰/胜负     §ARENA
+     [功能区2]   左上弹珠面板 RELEASE/MULTIPLY/SPIN          §PLINKO
+     [功能区3]   右上技能转盘 + 终极转盘 + 各技能实现         §WHEEL / §SKILLS
+     [特效]      粒子/冲击波/提示 toast                      §FX
+     [渲染]      render() 及各 draw* 函数                    §RENDER
+     [主循环]    step()/frame() 子步进物理                   §LOOP
+     [UI]        顶栏控件/开局选择界面/调试面板               §UI
+   ------------------------------------------------------------
+   三个功能区:
+     1) 主战场:四角炮台 + 染色格子地面 + 血量淘汰
+     2) 左上弹珠面板:RELEASE / MULTIPLY / SPIN
+     3) 右上技能转盘:旋转缺口,掉出触发技能
    ============================================================ */
 const cv = document.getElementById('cv');
 const ctx = cv.getContext('2d');
 const W = 1600, H = 900;
 let SPEED = 1, paused = false;
 
-/* ---------- 可调配置 ---------- */
+/* ===== §CONFIG 可调配置:画布尺寸、战场常量 ===== */
 const N = 64;                 // 格子数 N×N
 const BS = 700;               // 战场像素尺寸
 const BX = 450, BY = 130;     // 战场左上角
@@ -181,7 +195,7 @@ const CFG = {
   marbleDmg: [1,1,1,1],       // 单颗弹珠伤害(对格子与炮台)
 };
 
-/* ---------- 工具 ---------- */
+/* ---------- 工具函数 ---------- */
 const rand = (a,b) => a + Math.random()*(b-a);
 function shade(hex, f){
   const n = parseInt(hex.slice(1),16);
@@ -198,7 +212,7 @@ function fmt(n){
 }
 function norm(a){ a %= Math.PI*2; if(a < 0) a += Math.PI*2; return a; }
 
-/* ---------- 战场格子(离屏画布,只重绘变化格) ---------- */
+/* ===== §GRID 战场格子(离屏画布,只重绘变化格) ===== */
 const bc = document.createElement('canvas');
 bc.width = BS; bc.height = BS;
 const bctx = bc.getContext('2d');
@@ -233,9 +247,8 @@ function paintCell(i, j, o){
   cells[k] = o; cellHp[k] = 1;
   drawCell(i, j, o);
 }
-// 攻击一格:扣 dmg 点;格子血归零→翻色、补满 1 血(实际逐格逻辑在弹珠循环内联实现)
 
-/* ---------- 状态 ---------- */
+/* ===== §STATE 全局状态 + reset() 初始化 ===== */
 let cannons, marbles, counts, plinkoBalls, wheelBalls, pierceBalls, bombBalls, nukeBalls, homingBalls, ultraBalls, shockwaves, waves, particles, toasts, flashes, segFlashes, segFlashes2;
 let t, spawnTimer, rrIdx, theta, theta2, pegTheta, plusVal, gameOver, winner, winTimer, confettiT;
 
@@ -298,7 +311,9 @@ function initTrait(c){
 }
 
 /* ============================================================
-   功能区 1:主战场
+   §ARENA 功能区 1:主战场
+   炮台行为(updateCannons/特性) → 弹珠物理(updateMarbles)
+   → 伤害结算(applyDamage/onLethal/eliminate) → 胜负(checkWin)
    ============================================================ */
 function updateCannons(h){
   for(const c of cannons){
@@ -341,11 +356,11 @@ function updateCannons(h){
         toast('🧱 ' + TEAMS[id].name + ' 固土:全域格子 +1 生命', TEAMS[id].ball);
       }
     }
-    // 增殖:每 2 秒获得 = 面板弹珠数 的弹药
+    // 增殖:每 10 秒获得 = 面板弹珠数 的弹药
     if(c.trait === 'plinko'){
       c.plinkoAcc += h;
-      if(c.plinkoAcc >= 2){
-        c.plinkoAcc -= 2;
+      if(c.plinkoAcc >= 10){
+        c.plinkoAcc -= 10;
         let n = 0; for(const b of plinkoBalls) if(b.c === id) n++;
         if(n > 0){ c.ammo = Math.min(AMMO_CAP, c.ammo + n); spark(c.x, c.y-30, TEAMS[id].ball); }
       }
@@ -354,7 +369,7 @@ function updateCannons(h){
     if(c.trait === 'nomad') nomadMove(c, h);
   }
 }
-const NOMAD_SPEED = 18;   // 游牧漂移速度(像素/秒,极慢)
+const NOMAD_SPEED = 15;   // 游牧漂移速度(像素/秒,极慢)
 const NOMAD_SPIN = 1.5;   // 游牧炮口旋转角速度(弧度/秒)
 function nomadMove(c, h){
   // 偶尔轻微改变方向,漂得更自然
@@ -485,9 +500,9 @@ function updateMarbles(h){
     const px = m.x, py = m.y;
     m.x += m.vx*h; m.y += m.vy*h;
     // 撞墙反弹(相位弹珠撞墙有 25% 概率改变角度)
-    if(m.x < BX+MR){ m.x = BX+MR; m.vx =  Math.abs(m.vx)*0.85; if(isPhase) phaseWallKick(m); }
+    if(m.x < BX+MR){ m.x = BX+MR; m.vx =  Math.abs(m.vx); if(isPhase) phaseWallKick(m); }
     else if(m.x > BX+BS-MR){ m.x = BX+BS-MR; m.vx = -Math.abs(m.vx); if(isPhase) phaseWallKick(m); }
-    if(m.y < BY+MR){ m.y = BY+MR; m.vy =  Math.abs(m.vy)*0.85; if(isPhase) phaseWallKick(m); }
+    if(m.y < BY+MR){ m.y = BY+MR; m.vy =  Math.abs(m.vy); if(isPhase) phaseWallKick(m); }
     else if(m.y > BY+BS-MR){ m.y = BY+BS-MR; m.vy = -Math.abs(m.vy); if(isPhase) phaseWallKick(m); }
     // 敌方护盾:碰到即消失(永久护盾同时扣 1 点护盾值)
     let dead = false;
@@ -639,7 +654,7 @@ function checkWin(h){
 }
 
 /* ============================================================
-   功能区 2:左上弹珠面板  RELEASE / MULTIPLY / SPIN
+   §PLINKO 功能区 2:左上弹珠面板  RELEASE / MULTIPLY / SPIN
    ============================================================ */
 const PX=14, PY=14, PW=336, PH=690, SLOT_H=46, PBR=7;
 const SLOT_RAMP = 360;   // RELEASE→MULTIPLY 宽度过渡所需秒数
@@ -660,10 +675,8 @@ const pegs = [];
 function newPlinkoBall(c){
   return { x:rand(PX+24, PX+PW-24), y:PY+26, vx:rand(-90,90), vy:0, c };
 }
-function respawnPlinko(b){
-  b.x = rand(PX+24, PX+PW-24); b.y = PY+26;
-  b.vx = rand(-90,90); b.vy = 0;
-}
+// 小球落到底部后回顶部重新下落:复用初始化逻辑,保留原颜色
+function respawnPlinko(b){ Object.assign(b, newPlinkoBall(b.c)); }
 function updatePlinko(h){
   const out = [];
   for(const b of plinkoBalls){
@@ -717,7 +730,7 @@ function slotEffect(ci, slot){
 function flash(slot){ flashes.push({slot, t:0.35}); }
 
 /* ============================================================
-   功能区 3:右上技能转盘
+   §WHEEL 功能区 3:右上技能转盘
    结构:内圈弹跳区(带圆形节点)→ 固定内圈挡板(只留底部小口)
         → 旋转的技能圆环,小球落入哪个扇区就触发哪个技能
    ============================================================ */
@@ -979,6 +992,30 @@ function ultimateSkill(b, ang){
   }
 }
 
+/* ============================================================
+   §SKILLS 各技能弹体:炸弹 / 追踪弹 / 核弹+冲击波 / 贯穿弹
+   每种都有 fireXxx(发射) + updateXxx(每帧推进与碰撞)
+   ============================================================ */
+// 吞噬:清除以 (cx,cy) 为心、半径平方 = r2 范围内所有非 owner 颜色的弹体
+// (普通弹珠 / 贯穿弹 / 追踪弹直接移除;炸弹 / 核弹打 dead 标记由各自循环清理)
+// 炸弹爆炸与核弹冲击波共用此逻辑
+function engulf(cx, cy, r2, owner){
+  marbles = marbles.filter(m => {
+    if(m.c !== owner){ const dx=m.x-cx, dy=m.y-cy; if(dx*dx+dy*dy < r2){ counts[m.c]--; return false; } }
+    return true;
+  });
+  pierceBalls = pierceBalls.filter(p => {
+    if(p.c !== owner){ const dx=p.x-cx, dy=p.y-cy; if(dx*dx+dy*dy < r2) return false; }
+    return true;
+  });
+  homingBalls = homingBalls.filter(b => {
+    if(b.c !== owner){ const dx=b.x-cx, dy=b.y-cy; if(dx*dx+dy*dy < r2) return false; }
+    return true;
+  });
+  for(const ob of bombBalls){ if(ob.c !== owner && !ob.dead){ const dx=ob.x-cx, dy=ob.y-cy; if(dx*dx+dy*dy < r2) ob.dead = true; } }
+  for(const ob of nukeBalls){ if(ob.c !== owner && !ob.dead){ const dx=ob.x-cx, dy=ob.y-cy; if(dx*dx+dy*dy < r2) ob.dead = true; } }
+}
+
 /* ---------- 技能:炸弹弹珠 ---------- */
 function fireBomb(c){
   const a = c.aim;
@@ -1026,39 +1063,8 @@ function bombAt(ci, tx, ty){
       const dx=i-tx, dy=j-ty;
       if(dx*dx+dy*dy <= rc*rc) paintCell(i, j, ci);
     }
-  // 波及范围内其他颜色弹珠全部消失
-  marbles = marbles.filter(m => {
-    if(m.c !== ci){
-      const dx=m.x-bx, dy=m.y-by;
-      if(dx*dx+dy*dy < R*R){ counts[m.c]--; return false; }
-    }
-    return true;
-  });
-  // 贯穿弹被波及时无视生命直接消失
-  pierceBalls = pierceBalls.filter(p => {
-    if(p.c !== ci){
-      const dx=p.x-bx, dy=p.y-by;
-      if(dx*dx+dy*dy < R*R) return false;
-    }
-    return true;
-  });
-  // 其他颜色的炸弹/核弹弹珠也会被殉爆清除(打标记,循环外统一移除)
-  for(const ob of bombBalls){
-    if(ob.c !== ci && !ob.dead){
-      const dx=ob.x-bx, dy=ob.y-by;
-      if(dx*dx+dy*dy < R*R) ob.dead = true;
-    }
-  }
-  for(const ob of nukeBalls){
-    if(ob.c !== ci && !ob.dead){
-      const dx=ob.x-bx, dy=ob.y-by;
-      if(dx*dx+dy*dy < R*R) ob.dead = true;
-    }
-  }
-  homingBalls = homingBalls.filter(b => {
-    if(b.c !== ci){ const dx=b.x-bx, dy=b.y-by; if(dx*dx+dy*dy < R*R) return false; }
-    return true;
-  });
+  // 波及范围内其他颜色的弹珠/贯穿弹/追踪弹消失,炸弹/核弹殉爆
+  engulf(bx, by, R*R, ci);
   explosion(bx, by, TEAMS[ci].ball, 110, 520);
   waves.push({ x:bx, y:by, r:0, max:R+30, col:TEAMS[ci].ball });
   toast('💣 ' + TEAMS[ci].name + ' 炸弹爆炸!', TEAMS[ci].ball);
@@ -1195,38 +1201,8 @@ function updateShockwaves(h){
   const out = [];
   for(const w of shockwaves){
     w.r += NUKE_SPEED*h;
-    const r2 = w.r*w.r;
-    // 冲击波吞噬其他颜色的小球(网格颜色不变)
-    marbles = marbles.filter(m => {
-      if(m.c !== w.c){
-        const dx=m.x-w.x, dy=m.y-w.y;
-        if(dx*dx+dy*dy < r2){ counts[m.c]--; return false; }
-      }
-      return true;
-    });
-    pierceBalls = pierceBalls.filter(p => {
-      if(p.c !== w.c){
-        const dx=p.x-w.x, dy=p.y-w.y;
-        if(dx*dx+dy*dy < r2) return false;
-      }
-      return true;
-    });
-    for(const ob of bombBalls){
-      if(ob.c !== w.c && !ob.dead){
-        const dx=ob.x-w.x, dy=ob.y-w.y;
-        if(dx*dx+dy*dy < r2) ob.dead = true;
-      }
-    }
-    for(const ob of nukeBalls){
-      if(ob.c !== w.c && !ob.dead){
-        const dx=ob.x-w.x, dy=ob.y-w.y;
-        if(dx*dx+dy*dy < r2) ob.dead = true;
-      }
-    }
-    homingBalls = homingBalls.filter(b => {
-      if(b.c !== w.c){ const dx=b.x-w.x, dy=b.y-w.y; if(dx*dx+dy*dy < r2) return false; }
-      return true;
-    });
+    // 冲击波吞噬其他颜色的弹体(网格颜色不变)
+    engulf(w.x, w.y, w.r*w.r, w.c);
     if(w.r < NUKE_R) out.push(w);
   }
   shockwaves = out;
@@ -1302,7 +1278,9 @@ function updatePierce(h){
   pierceBalls = out;
 }
 
-/* ---------- 冲击波视觉 ---------- */
+/* ============================================================
+   §FX 特效:冲击波环 / 爆炸粒子 / 顶部提示 toast
+   ============================================================ */
 function updateWaves(h){
   for(const w of waves) w.r += 900*h;
   waves = waves.filter(w => w.r < w.max);
@@ -1345,7 +1323,7 @@ function updateToasts(h){
 }
 
 /* ============================================================
-   渲染
+   §RENDER 渲染:render() 每帧统一绘制各图层
    ============================================================ */
 function render(){
   ctx.fillStyle = '#070709';
@@ -1474,11 +1452,7 @@ function drawWaves(){
   ctx.globalAlpha = 1;
 }
 function drawCannon(c){
-  if(!c.alive){
-/*     ctx.fillStyle = '#222';
-    ctx.beginPath(); ctx.arc(c.x, c.y, 16, 0, 6.283); ctx.fill(); */
-    return;
-  }
+  if(!c.alive) return;   // 已淘汰的炮台不绘制
   const tm = TEAMS[c.idx];
   // 护盾
   if(shielded(c)){
@@ -1643,7 +1617,7 @@ function drawWheel(){
     ctx.translate(WX+Math.cos(am)*lr, WY+Math.sin(am)*lr);
     ctx.rotate(am + Math.PI/2);
     ctx.fillStyle = s === 9 ? '#ffe27a' : '#e8e8e8';
-    ctx.font = s === 9 ? 'bold 10px Verdana' : 'bold 10px Verdana';
+    ctx.font = 'bold 10px Verdana';
     ctx.textAlign = 'center';
     ctx.fillText(s === 9 ? '★' : LABELS[s], 0, 4);
     ctx.restore();
@@ -1775,7 +1749,9 @@ function drawOver(){
   ctx.textAlign = 'left';
 }
 
-/* ---------- 主循环(子步进保证物理稳定) ---------- */
+/* ============================================================
+   §LOOP 主循环:step() 单步推进所有系统,frame() 子步进物理
+   ============================================================ */
 function step(h){
   t += h;
   if(!gameOver){
@@ -1816,7 +1792,10 @@ function frame(now){
   render();
 }
 
-/* ---------- 控件 ---------- */
+/* ============================================================
+   §UI 顶栏控件 / 开局选择界面 / 调试面板
+   ============================================================ */
+/* ---------- 顶栏控件 ---------- */
 const btnPause = document.getElementById('btnPause');
 btnPause.onclick = () => {
   paused = !paused;
