@@ -144,16 +144,15 @@ const W = 1600, H = 900;
 let SPEED = 1, paused = false;
 
 /* ===== §CONFIG 可调配置:画布尺寸、战场常量 ===== */
-const N = 64;                 // 格子数 N×N
+const N = 80;                 // 格子数 N×N
 const BS = 700;               // 战场像素尺寸
 const BX = 450, BY = 130;     // 战场左上角
 const CS = BS / N;            // 单格尺寸
 const MAX_HP = 100;            // 炮台血量
 const AMMO_CAP = 1048576;     // 弹药上限(防爆炸)
 const MARBLE_CAP = 20000;       // 每色场上弹珠上限(保性能)
-const PLINKO_INTERVAL = 0.55; // 弹珠面板掉球间隔(秒)
 const MR = 4.5;               // 战场弹珠半径
-const SHIELD_R = 55;          // 护盾半径
+const SHIELD_R = 45;          // 护盾半径
 const PR = 10;                // 贯穿弹半径
 const BBR = 9;                // 炸弹弹珠半径
 const BOMB_RC = 9;            // 炸弹爆炸半径(格)
@@ -190,7 +189,7 @@ const CFG = {
   spMin: [90,90,90,90],   // 弹珠初速下限
   spMax: [160,160,160,160],   // 弹珠初速上限
   damp:  [0.95,0.95,0.95,0.95],// 弹珠阻力(每秒保留比例)
-  swing: [1.0,1.0,1.0,1.0],   // 炮口摆动幅度(弧度)
+  swing: [1.1,1.1,1.1,1.1],   // 炮口摆动幅度(弧度)
   fireRateMax: [500,500,500,500], // 射速上限
   marbleDmg: [1,1,1,1],       // 单颗弹珠伤害(对格子与炮台)
 };
@@ -263,7 +262,7 @@ function reset(){
   cellHp = new Int16Array(N*N).fill(1);   // 每格默认生命值 1
 
   // 初始领地:四角四分之一圆
-  const R = N*0.40;
+  const R = N*0.20;
   const cc = TEAMS.map(tm => [tm.corner[0]*(N-1), tm.corner[1]*(N-1)]);
   for(let j=0;j<N;j++) for(let i=0;i<N;i++){
     let o = -1;
@@ -275,7 +274,7 @@ function reset(){
     drawCell(i,j,o);
   }
   cannons = TEAMS.map((tm, idx) => {
-    const off = Math.round(N*0.11);
+    const off = Math.round(N*0.07);
     const ci = tm.corner[0] ? N-1-off : off;
     const cj = tm.corner[1] ? N-1-off : off;
     const x = BX + (ci+0.5)*CS, y = BY + (cj+0.5)*CS;
@@ -458,7 +457,7 @@ function guardHit(x, y, atkColor, rad, dmg){
   }
   return null;
 }
-const MAGNET_R = 100;        // 磁场作用半径
+const MAGNET_R = 60;        // 磁场作用半径
 const MAGNET_FORCE = 500;  // 磁场推力强度
 // 对一个带 vx/vy 的弹体施加敌方磁场排斥;scale<1 用于削弱大型弹珠
 function applyMagnet(obj, h, scale){
@@ -708,7 +707,7 @@ function checkWin(h){
    §PLINKO 功能区 2:左上弹珠面板  RELEASE / MULTIPLY / SPIN
    ============================================================ */
 const PX=14, PY=14, PW=336, PH=690, SLOT_H=46, PBR=7;
-const SLOT_RAMP = 360;   // RELEASE→MULTIPLY 宽度过渡所需秒数
+const SLOT_RAMP = 600;   // RELEASE→MULTIPLY 宽度过渡所需秒数
 // 槽位边界:开局 RELEASE/MULTIPLY 各 0.40,随时间过渡到 0.16/0.64(=1:4),SPIN 固定 0.20
 function slotBounds(){
   const k = Math.min(1, t/SLOT_RAMP);
@@ -785,12 +784,17 @@ function flash(slot){ flashes.push({slot, t:0.35}); }
    结构:内圈弹跳区(带圆形节点)→ 固定内圈挡板(只留底部小口)
         → 旋转的技能圆环,小球落入哪个扇区就触发哪个技能
    ============================================================ */
-const WX=1408, WY=205, WR=150, IR=106, SEG=Math.PI*2/8;
+const WX=1408, WY=205, WR=150, IR=106;
 const GAP_HALF = 0.30;   // 内圈挡板底部缺口的半宽(弧度)
-const SMALL_SEG = 0.16;                      // ★ 小扇区(进入终极转盘的入口)
-const BIG_SEG = (Math.PI*2 - SMALL_SEG)/9;   // 9 个常规技能扇区
+const SMALL_SEG = 0.16;       // ★ 小扇区(进入终极转盘)的初始角宽(弧度)
+const BIG_SEG = 0.30;    // ★ 小扇区随时间变宽的最大目标角宽(弧度)
+const STAR_RAMP = 360;        // ★ 小扇区从初始变到最大所需秒数
+// 当前 ★ 小扇区角宽:随时间从 SMALL_SEG 线性变宽到 BIG_SEG
+function starSeg(){ return SMALL_SEG + (BIG_SEG - SMALL_SEG)*Math.min(1, t/STAR_RAMP); }
+// 其余 9 个常规技能扇区均分剩下的圆环(★ 越宽,常规扇区越窄)
+function regSeg(){ return (Math.PI*2 - starSeg())/9; }
 // ---- 终极技能转盘(下方,结构与上方相同)----
-const WX2 = WX, WY2 = 570, SEG2 = Math.PI*2/7;
+const WX2 = WX, WY2 = 570, SEG = Math.PI*2/7;
 const ULT_LABELS = ['+弹珠','上限+50','盾100','×10','+1命','核弹','底弹+1'];
 const LABELS = ['+1','护盾','×4','偷取','炸弹','贯穿','回血','上限+10','追踪弹'];
 const PEG_OMEGA = -0.9;   // 内圈节点旋转角速度(与技能环反向,搅动小球)
@@ -874,12 +878,13 @@ function updateWheel(h){
 }
 function triggerSkill(b, ang){
   const rel = norm(ang - theta);
-  if(rel >= 9*BIG_SEG){                  // ★ 小扇区:小球进入下方终极转盘
+  const reg = regSeg();
+  if(rel >= 9*reg){                  // ★ 小扇区(占据 9 个常规扇区之后的剩余):进入终极转盘
     segFlashes.push({ s:9, t:0.8, col:TEAMS[b.c].ball });
     enterUltimate(b);
     return;
   }
-  const s = Math.min(8, Math.floor(rel/BIG_SEG));    // 落点所在扇区
+  const s = Math.min(8, Math.floor(rel/reg));    // 落点所在扇区
   const c = cannons[b.c];
   const tm = TEAMS[b.c];
   segFlashes.push({ s, t:0.8, col:tm.ball });
@@ -922,8 +927,7 @@ function triggerSkill(b, ang){
     case 4:    // 炸弹:发射炸弹弹珠,碰到不同颜色区域时爆炸
       fireBomb(c);
       break;
-    case 5: {  // 贯穿弹:生命值 = max(10, 待发弹药 10%)
-      if(c.queue < 1){ toast(tm.name + ' 无待发弹药,贯穿弹未能发射', tm.ball); break; }
+    case 5: {  // 贯穿弹:生命值 = max(10, 待发弹药 10%),保底 10
       const n = Math.max(10, Math.floor(c.queue*0.10));
       c.queue = Math.max(0, c.queue - n);
       const a = c.aim;
@@ -1005,7 +1009,7 @@ function updateUltimate(h){
   ultraBalls = out;
 }
 function ultimateSkill(b, ang){
-  const s = Math.floor(norm(ang - theta2)/SEG2) % 7;
+  const s = Math.floor(norm(ang - theta2)/SEG) % 7;
   const c = cannons[b.c];
   const tm = TEAMS[b.c];
   segFlashes2.push({ s, t:0.8, col:tm.ball });
@@ -1127,9 +1131,8 @@ const HOMING_TURN = 0.5;       // 转向速率(弧度/秒)
 const HBR = 9;                 // 追踪弹半径
 function fireHoming(c){
   const tm = TEAMS[c.idx];
-  if(c.queue < 1){ toast(tm.name + ' 无待发弹药,追踪弹未能发射', tm.ball); return; }
-  const n = Math.max(10, Math.floor(c.queue*0.10));  // 生命 = max(10, 待发弹药 10%)
-  c.queue = Math.max(0, c.queue - n);                 // 扣除待发子弹
+  const n = Math.max(10, Math.floor(c.queue*0.10));  // 生命 = max(10, 待发弹药 10%),保底 10
+  c.queue = Math.max(0, c.queue - n);                 // 扣除待发子弹(不足则清零)
   const a = c.aim;
   homingBalls.push({ x:c.x+Math.cos(a)*36, y:c.y+Math.sin(a)*36, dir:a, c:c.idx, hp:n });
   toast('🎯 ' + tm.name + ' 发射追踪弹 (HP ' + fmt(n) + ')!', tm.ball);
@@ -1668,10 +1671,11 @@ function drawWheel(){
   ctx.fillStyle = '#0d0d10';
   ctx.beginPath(); ctx.arc(WX, WY, WR+30, 0, 6.283); ctx.fill();
   ctx.strokeStyle = '#2a2a30'; ctx.lineWidth = 2; ctx.stroke();
-  // 旋转的技能圆环(9 常规扇区 + 1 个 ★ 小扇区)
+  // 旋转的技能圆环(9 常规扇区 + 1 个 ★ 小扇区,★ 随时间变宽)
+  const reg = regSeg();
   for(let s=0;s<10;s++){
-    const a0 = theta + Math.min(s,9)*BIG_SEG;
-    const a1 = s < 9 ? a0 + BIG_SEG : theta + Math.PI*2;
+    const a0 = theta + Math.min(s,9)*reg;
+    const a1 = s < 9 ? a0 + reg : theta + Math.PI*2;
     const fl = segFlashes.find(f => f.s === s);
     if(fl){
       ctx.globalAlpha = Math.min(1, fl.t/0.4);
@@ -1737,7 +1741,7 @@ function drawUltimate(){
   ctx.beginPath(); ctx.arc(WX2, WY2, WR+30, 0, 6.283); ctx.fill();
   ctx.strokeStyle = '#6b5a1f'; ctx.lineWidth = 2; ctx.stroke();
   for(let s=0;s<7;s++){
-    const a0 = theta2 + s*SEG2, a1 = a0 + SEG2;
+    const a0 = theta2 + s*SEG, a1 = a0 + SEG;
     const fl = segFlashes2.find(f => f.s === s);
     if(fl){
       ctx.globalAlpha = Math.min(1, fl.t/0.4);
@@ -1756,7 +1760,7 @@ function drawUltimate(){
     ctx.moveTo(WX2+Math.cos(a0)*IR, WY2+Math.sin(a0)*IR);
     ctx.lineTo(WX2+Math.cos(a0)*WR, WY2+Math.sin(a0)*WR);
     ctx.stroke();
-    const am = a0 + SEG2/2, lr = (IR+WR)/2;
+    const am = a0 + SEG/2, lr = (IR+WR)/2;
     ctx.save();
     ctx.translate(WX2+Math.cos(am)*lr, WY2+Math.sin(am)*lr);
     ctx.rotate(am + Math.PI/2);
