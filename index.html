@@ -442,7 +442,8 @@ function damageGuard(cn, g, dmg){
   g.hp -= dmg;
   if(g.hp <= 0){ g.alive = false; g.regen = GUARD_REGEN; spark(cn.x, cn.y, '#fff'); }
 }
-function guardHit(x, y, atkColor, rad, dmg){   // 命中任一敌方存活扇形挡板?命中则扣其 dmg 血
+// 命中任一敌方存活扇形挡板?命中则扣其 dmg 血,返回被命中的炮台(供弹开用),否则 null
+function guardHit(x, y, atkColor, rad, dmg){
   for(const cn of cannons){
     if(!cn.alive || cn.idx === atkColor || !cn.guards.length) continue;
     const dx=x-cn.x, dy=y-cn.y, dist=Math.hypot(dx,dy);
@@ -452,10 +453,10 @@ function guardHit(x, y, atkColor, rad, dmg){   // 命中任一敌方存活扇形
       if(!g.alive) continue;
       let d = Math.abs(norm(ang - g.ang));
       if(d > Math.PI) d = Math.PI*2 - d;
-      if(d < GUARD_SPAN/2){ if(dmg) damageGuard(cn, g, dmg); return true; }
+      if(d < GUARD_SPAN/2){ if(dmg) damageGuard(cn, g, dmg); return cn; }
     }
   }
-  return false;
+  return null;
 }
 const MAGNET_R = 100;        // 磁场作用半径
 const MAGNET_FORCE = 500;  // 磁场推力强度
@@ -1169,8 +1170,19 @@ function updateHoming(h){
         }
       }
     }
-    // 敌方挡板:追踪弹被挡住扣 1 血,同时对挡板扣 1 血
-    if(!dead && guardHit(b.x, b.y, b.c, HBR, 1)){ b.hp--; spark(b.x,b.y,TEAMS[b.c].ball); if(b.hp<=0) dead=true; }
+    // 敌方挡板:追踪弹扣当前一半血,挡板扣相同值(≤0 破坏),推到挡板外并朝外弹开
+    if(!dead){
+      const loss = Math.ceil(b.hp/2);
+      const hcn = guardHit(b.x, b.y, b.c, HBR, loss);
+      if(hcn){
+        b.hp -= loss; spark(b.x,b.y,TEAMS[b.c].ball);
+        const dx=b.x-hcn.x, dy=b.y-hcn.y, d=Math.hypot(dx,dy)||1, nx=dx/d, ny=dy/d;
+        const out2 = GUARD_RAD+GUARD_THICK+HBR+0.5;
+        b.x = hcn.x+nx*out2; b.y = hcn.y+ny*out2;   // 推到挡板外,避免穿过去打炮台
+        b.dir = Math.atan2(ny, nx);                 // 朝外
+        if(b.hp<=0) dead=true;
+      }
+    }
     // 啃格子(与贯穿弹同逻辑)
     if(!dead){
       const dx=b.x-px0, dy=b.y-py0, d=Math.hypot(dx,dy);
@@ -1285,6 +1297,20 @@ function updatePierce(h){
           spark(p.x, p.y, TEAMS[p.c].ball);
           if(p.hp <= 0) dead = true;
         }
+      }
+    }
+    // 敌方挡板:贯穿弹扣当前一半血,挡板扣相同值(≤0 破坏),反弹
+    if(!dead){
+      const loss = Math.ceil(p.hp/2);
+      const hcn = guardHit(p.x, p.y, p.c, PR, loss);
+      if(hcn){
+        const dx=p.x-hcn.x, dy=p.y-hcn.y, d=Math.hypot(dx,dy)||1, nx=dx/d, ny=dy/d;
+        const out2 = GUARD_RAD+GUARD_THICK+PR+0.5;
+        p.x = hcn.x+nx*out2; p.y = hcn.y+ny*out2;
+        const dot = p.vx*nx + p.vy*ny;
+        if(dot < 0){ p.vx -= 2*dot*nx; p.vy -= 2*dot*ny; }
+        p.hp -= loss; spark(p.x, p.y, TEAMS[p.c].ball);
+        if(p.hp <= 0) dead = true;
       }
     }
     // 敌方炮台:造成剩余生命值的伤害后消失
@@ -1869,6 +1895,19 @@ const setupGrid = document.getElementById('setupGrid');
 let setupTrait = CFG.trait.slice();
 // 由炮台主色(ball)派生较亮的领地格子色(cell)
 function deriveCell(ball){ return shade(ball, 0.40); }
+// 由 hex 主色推断中文颜色名(用于实时通报/队名),按 HSL 色相归类
+function colorName(hex){
+  const n = parseInt(hex.slice(1),16);
+  const r=(n>>16)/255, g=((n>>8)&255)/255, b=(n&255)/255;
+  const mx=Math.max(r,g,b), mn=Math.min(r,g,b), l=(mx+mn)/2, dlt=mx-mn;
+  if(dlt < 0.08) return l>0.8?'白色':l<0.18?'黑色':'灰色';   // 接近无彩色
+  let h;
+  if(mx===r) h=((g-b)/dlt)%6; else if(mx===g) h=(b-r)/dlt+2; else h=(r-g)/dlt+4;
+  h*=60; if(h<0) h+=360;
+  const map=[[15,'红色'],[45,'橙色'],[70,'黄色'],[160,'绿色'],[195,'青色'],[255,'蓝色'],[290,'紫色'],[330,'粉色'],[360,'红色']];
+  for(const [t,nm] of map) if(h<t) return nm;
+  return '红色';
+}
 function buildSetup(){
   setupGrid.innerHTML = '';
   for(let i=0;i<4;i++){
@@ -1880,7 +1919,7 @@ function buildSetup(){
       '<button class="traitBtn'+(setupTrait[i]===k?' sel':'')+'" data-team="'+i+'" data-key="'+k+'">'+TRAITS[k].name+'</button>'
     ).join('');
     card.innerHTML =
-      '<h4><span class="dot" id="dot'+i+'" style="background:'+tm.ball+'"></span>'+tm.name+'炮台'+
+      '<h4><span class="dot" id="dot'+i+'" style="background:'+tm.ball+'"></span><span id="tname'+i+'">'+tm.name+'炮台</span>'+
         '<input type="color" class="colPick" data-team="'+i+'" value="'+tm.ball+'" title="自选炮台颜色" '+
         'style="margin-left:auto;width:34px;height:24px;padding:0;border:1px solid #2a2a30;border-radius:5px;background:none;cursor:pointer;"></h4>'+
       '<div class="traitRow">'+row+'</div>'+
@@ -1902,7 +1941,9 @@ function buildSetup(){
       const ti = +inp.dataset.team;
       TEAMS[ti].ball = inp.value;
       TEAMS[ti].cell = deriveCell(inp.value);
+      TEAMS[ti].name = colorName(inp.value);              // 队名随颜色更新(实时通报跟着变)
       document.getElementById('dot'+ti).style.background = inp.value;
+      document.getElementById('tname'+ti).textContent = TEAMS[ti].name + '炮台';
       setupGrid.children[ti].style.borderColor = inp.value;
     };
   });
