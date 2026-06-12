@@ -100,8 +100,8 @@
   只能从内圈挡板底部的小口掉进不断旋转的技能圆环——落在哪个扇区就触发哪个技能。
   <b>八个技能:</b>+n(弹药+n,每触发一次 n 加 1)/ 护盾(10 秒,敌方小球碰到即消失)/ ×4(弹药×4)/
   偷取(夺走弹药最多对手的一半弹药)/ 炸弹(发射炸弹弹珠,碰到不同颜色区域时大范围爆炸:染色并清除范围内敌方小球与贯穿弹)/
-  贯穿弹(消耗一半弹药,逐格染色每格扣 1 生命,命中炮台造成剩余生命值伤害,撞护盾扣 1 反弹)/
-  回血(生命回满)/ 上限+10(生命上限+10)/ 追踪弹(缓慢移动并转向最近敌方炮台,生命 = 待发弹药 10%)。
+  贯穿弹(消耗一半弹药,大小随生命值增加,按边缘逐格染色,可撞普通小球互拼生命,命中炮台造成剩余生命值伤害,撞护盾反弹)/
+  回血(生命回满)/ 上限+10(生命上限+10)/ 追踪弹(缓慢移动并转向最近敌方炮台,生命 = 待发弹药 10%,大小随生命值增加,可撞普通小球互拼生命)。
   转盘上金色 <b>★</b> 小扇区会把小球送入下方<b>终极转盘</b>:+弹珠(面板循环小球+1)/ 上限+50 /
   盾100(100 点永久护盾,可叠加,被打空才消失)/ ×10(弹药×10)/
   +1命(阵亡时满血复活并获 20 秒护盾,弹药与场上弹珠清零,可叠加)/
@@ -189,7 +189,7 @@ const CFG = {
   spMin: [90,90,90,90],   // 弹珠初速下限
   spMax: [160,160,160,160],   // 弹珠初速上限
   damp:  [0.95,0.95,0.95,0.95],// 弹珠阻力(每秒保留比例)
-  swing: [1.1,1.1,1.1,1.1],   // 炮口摆动幅度(弧度)
+  swing: [1.2,1.2,1.2,1.2],   // 炮口摆动幅度(弧度)
   fireRateMax: [500,500,500,500], // 射速上限
   marbleDmg: [1,1,1,1],       // 单颗弹珠伤害(对格子与炮台)
 };
@@ -787,7 +787,7 @@ function flash(slot){ flashes.push({slot, t:0.35}); }
 const WX=1408, WY=205, WR=150, IR=106;
 const GAP_HALF = 0.30;   // 内圈挡板底部缺口的半宽(弧度)
 const SMALL_SEG = 0.16;       // ★ 小扇区(进入终极转盘)的初始角宽(弧度)
-const BIG_SEG = 0.30;    // ★ 小扇区随时间变宽的最大目标角宽(弧度)
+const BIG_SEG = 0.48;    // ★ 小扇区随时间变宽的最大目标角宽(弧度)
 const STAR_RAMP = 360;        // ★ 小扇区从初始变到最大所需秒数
 // 当前 ★ 小扇区角宽:随时间从 SMALL_SEG 线性变宽到 BIG_SEG
 function starSeg(){ return SMALL_SEG + (BIG_SEG - SMALL_SEG)*Math.min(1, t/STAR_RAMP); }
@@ -1129,6 +1129,73 @@ function bombAt(ci, tx, ty){
 const HOMING_SPEED = 50;       // 移速(慢)
 const HOMING_TURN = 0.5;       // 转向速率(弧度/秒)
 const HBR = 9;                 // 追踪弹半径
+
+// 追踪弹 / 贯穿弹动态半径:生命越高越大,并限制上限避免遮满战场
+const SKILL_R_HP_REF = 10;       // HP=10 时保持原始大小
+const SKILL_R_GROW = 0.70;       // 每 sqrt(HP差值) 增加的像素
+const SKILL_R_MAX = 44;          // 技能弹最大显示/碰撞半径
+function skillRadius(base, hp){
+  return Math.min(SKILL_R_MAX, base + Math.sqrt(Math.max(0, (hp || 0) - SKILL_R_HP_REF))*SKILL_R_GROW);
+}
+function pierceRadius(p){ return skillRadius(PR, p.hp); }
+function homingRadius(b){ return skillRadius(HBR, b.hp); }
+function circleTouchesCell(x, y, r, ci, cj){
+  const x0 = BX + ci*CS, y0 = BY + cj*CS;
+  const nx = Math.max(x0, Math.min(x, x0 + CS));
+  const ny = Math.max(y0, Math.min(y, y0 + CS));
+  const dx = x - nx, dy = y - ny;
+  return dx*dx + dy*dy <= r*r;
+}
+// 沿弹体移动路径检查“圆形边缘”扫过的所有格子,而不是只检查中心点所在格
+function eachSweptCell(x0, y0, x1, y1, r, fn){
+  const dx = x1 - x0, dy = y1 - y0, d = Math.hypot(dx, dy);
+  const stepLen = Math.max(2, Math.min(CS*0.45, Math.max(2, r*0.65)));
+  const steps = Math.max(1, Math.ceil(d / stepLen));
+  const seen = new Set();
+  for(let st=1; st<=steps; st++){
+    const xx = x0 + dx*st/steps, yy = y0 + dy*st/steps;
+    const i0 = Math.max(0, Math.floor((xx - BX - r) / CS));
+    const i1 = Math.min(N-1, Math.floor((xx - BX + r) / CS));
+    const j0 = Math.max(0, Math.floor((yy - BY - r) / CS));
+    const j1 = Math.min(N-1, Math.floor((yy - BY + r) / CS));
+    for(let cj=j0; cj<=j1; cj++){
+      for(let ci=i0; ci<=i1; ci++){
+        const key = cj*N + ci;
+        if(seen.has(key) || !circleTouchesCell(xx, yy, r, ci, cj)) continue;
+        seen.add(key);
+        if(fn(ci, cj, xx, yy)) return true;
+      }
+    }
+  }
+  return false;
+}
+// 技能弹与普通小球互拼生命:双方各扣掉对方当前生命值,归零/小于 0 的一方移除
+function collideSkillWithMarbles(obj, r){
+  let hit = false;
+  const deadMarbles = [];
+  for(const m of marbles){
+    if(m.c === obj.c || m.hp <= 0) continue;
+    const dx = obj.x - m.x, dy = obj.y - m.y;
+    const rr = r + MR;
+    if(dx*dx + dy*dy < rr*rr){
+      const loss = Math.min(obj.hp, m.hp);
+      obj.hp -= loss;
+      m.hp -= loss;
+      hit = true;
+      spark((obj.x + m.x)/2, (obj.y + m.y)/2, '#fff');
+      if(m.hp <= 0) deadMarbles.push(m);
+      if(obj.hp <= 0) break;
+    }
+  }
+  if(deadMarbles.length){
+    const dead = new Set(deadMarbles);
+    marbles = marbles.filter(m => {
+      if(dead.has(m)){ counts[m.c]--; return false; }
+      return true;
+    });
+  }
+  return obj.hp <= 0;
+}
 function fireHoming(c){
   const tm = TEAMS[c.idx];
   const n = Math.max(10, Math.floor(c.queue*0.10));  // 生命 = max(10, 待发弹药 10%),保底 10
@@ -1142,6 +1209,7 @@ function updateHoming(h){
   for(const b of homingBalls){
     if(!cannons[b.c].alive) continue;
     if(b.hp <= 0) continue;
+    let rad = homingRadius(b);
     // 找最近的敌方存活炮台
     let tgt=null, best=1e18;
     for(const cn of cannons){
@@ -1158,20 +1226,21 @@ function updateHoming(h){
     const px0=b.x, py0=b.y;
     b.x += Math.cos(b.dir)*HOMING_SPEED*h;
     b.y += Math.sin(b.dir)*HOMING_SPEED*h;
-    // 边界反弹
-    if(b.x < BX+HBR){ b.x=BX+HBR; b.dir=Math.PI-b.dir; }
-    else if(b.x > BX+BS-HBR){ b.x=BX+BS-HBR; b.dir=Math.PI-b.dir; }
-    if(b.y < BY+HBR){ b.y=BY+HBR; b.dir=-b.dir; }
-    else if(b.y > BY+BS-HBR){ b.y=BY+BS-HBR; b.dir=-b.dir; }
+    // 边界反弹:按当前动态半径贴边
+    if(b.x < BX+rad){ b.x=BX+rad; b.dir=Math.PI-b.dir; }
+    else if(b.x > BX+BS-rad){ b.x=BX+BS-rad; b.dir=Math.PI-b.dir; }
+    if(b.y < BY+rad){ b.y=BY+rad; b.dir=-b.dir; }
+    else if(b.y > BY+BS-rad){ b.y=BY+BS-rad; b.dir=-b.dir; }
     let dead=false;
-    // 敌方护盾:扣 1 并消耗护盾
+    // 敌方护盾:扣当前一半血并消耗护盾,碰撞范围按动态半径
     for(const cn of cannons){
       if(cn.alive && shielded(cn) && cn.idx !== b.c){
         const dx=b.x-cn.x, dy=b.y-cn.y;
-        if(dx*dx+dy*dy < (SHIELD_R+HBR)*(SHIELD_R+HBR)){
-          hitShield(cn); b.hp -= Math.ceil(b.hp/2); spark(b.x,b.y,TEAMS[b.c].ball);   // 撞护盾扣当前一半血
+        if(dx*dx+dy*dy < (SHIELD_R+rad)*(SHIELD_R+rad)){
+          hitShield(cn); b.hp -= Math.ceil(b.hp/2); spark(b.x,b.y,TEAMS[b.c].ball);
           if(b.hp<=0) dead=true;
           const d=Math.hypot(dx,dy)||1; b.dir=Math.atan2(dy/d,dx/d);   // 弹开
+          rad = homingRadius(b);
           break;
         }
       }
@@ -1179,40 +1248,40 @@ function updateHoming(h){
     // 敌方挡板:追踪弹扣当前一半血,挡板扣相同值(≤0 破坏),推到挡板外并朝外弹开
     if(!dead){
       const loss = Math.ceil(b.hp/2);
-      const hcn = guardHit(b.x, b.y, b.c, HBR, loss);
+      const hcn = guardHit(b.x, b.y, b.c, rad, loss);
       if(hcn){
         b.hp -= loss; spark(b.x,b.y,TEAMS[b.c].ball);
         const dx=b.x-hcn.x, dy=b.y-hcn.y, d=Math.hypot(dx,dy)||1, nx=dx/d, ny=dy/d;
-        const out2 = GUARD_RAD+GUARD_THICK+HBR+0.5;
+        rad = homingRadius(b);
+        const out2 = GUARD_RAD+GUARD_THICK+rad+0.5;
         b.x = hcn.x+nx*out2; b.y = hcn.y+ny*out2;   // 推到挡板外,避免穿过去打炮台
         b.dir = Math.atan2(ny, nx);                 // 朝外
         if(b.hp<=0) dead=true;
       }
     }
-    // 啃格子(与贯穿弹同逻辑)
+    // 可以撞普通小球:双方互拼生命,归零/小于0则移除
     if(!dead){
-      const dx=b.x-px0, dy=b.y-py0, d=Math.hypot(dx,dy);
-      const steps=Math.max(1,Math.ceil(d/(CS*0.7)));
-      let lci=-1,lcj=-1;
-      for(let st=1;st<=steps;st++){
-        const xx=px0+dx*st/steps, yy=py0+dy*st/steps;
-        const ci=((xx-BX)/CS)|0, cj=((yy-BY)/CS)|0;
-        if(ci<0||cj<0||ci>=N||cj>=N) continue;
-        if(ci===lci&&cj===lcj) continue; lci=ci; lcj=cj;
-        if(cells[cj*N+ci] !== b.c){
-          const cl=cellHp[cj*N+ci];
-          if(b.hp>=cl){ b.hp-=cl; setCell(ci,cj,b.c,1); }
-          else { cellHp[cj*N+ci]-=b.hp; drawCell(ci,cj,cells[cj*N+ci]); b.hp=0; }
-          if(b.hp<=0){ dead=true; break; }
-        }
-      }
+      dead = collideSkillWithMarbles(b, rad);
+      rad = homingRadius(b);
     }
-    // 命中炮台:造成剩余生命伤害
+    // 啃格子:按当前大小边缘扫过的所有格子结算,不再只看中心点
+    if(!dead){
+      dead = eachSweptCell(px0, py0, b.x, b.y, rad, (ci, cj, xx, yy) => {
+        if(cells[cj*N+ci] === b.c) return false;
+        const cl = cellHp[cj*N+ci];
+        if(b.hp >= cl){ b.hp -= cl; setCell(ci, cj, b.c, 1); }
+        else { cellHp[cj*N+ci] -= b.hp; drawCell(ci,cj,cells[cj*N+ci]); b.hp=0; }
+        if(b.hp <= 0){ b.x = xx; b.y = yy; spark(xx, yy, TEAMS[b.c].ball); return true; }
+        return false;
+      });
+      rad = homingRadius(b);
+    }
+    // 命中炮台:造成剩余生命伤害,碰撞范围按动态半径
     if(!dead){
       for(const cn of cannons){
         if(!cn.alive || cn.idx===b.c || shielded(cn)) continue;
         const dx=b.x-cn.x, dy=b.y-cn.y;
-        if(dx*dx+dy*dy < (28+HBR)*(28+HBR)){
+        if(dx*dx+dy*dy < (28+rad)*(28+rad)){
           explosion(b.x,b.y,TEAMS[b.c].ball,40,300);
           toast('🎯 追踪弹命中 ' + TEAMS[cn.idx].name + ' (-' + fmt(b.hp) + ' HP)', TEAMS[b.c].ball);
           applyDamage(cn, b.hp, b.c);
@@ -1281,18 +1350,19 @@ function updatePierce(h){
   const out = [];
   for(const p of pierceBalls){
     if(!cannons[p.c].alive) continue;   // 已淘汰颜色的贯穿弹直接清除
+    let rad = pierceRadius(p);
     const px0 = p.x, py0 = p.y;
     p.x += p.vx*h; p.y += p.vy*h;
-    // 撞墙反弹(不减速)
-    if(p.x < BX+PR){ p.x = BX+PR; p.vx =  Math.abs(p.vx); }
-    else if(p.x > BX+BS-PR){ p.x = BX+BS-PR; p.vx = -Math.abs(p.vx); }
-    if(p.y < BY+PR){ p.y = BY+PR; p.vy =  Math.abs(p.vy); }
-    else if(p.y > BY+BS-PR){ p.y = BY+BS-PR; p.vy = -Math.abs(p.vy); }
+    // 撞墙反弹(不减速):按当前动态半径贴边
+    if(p.x < BX+rad){ p.x = BX+rad; p.vx =  Math.abs(p.vx); }
+    else if(p.x > BX+BS-rad){ p.x = BX+BS-rad; p.vx = -Math.abs(p.vx); }
+    if(p.y < BY+rad){ p.y = BY+rad; p.vy =  Math.abs(p.vy); }
+    else if(p.y > BY+BS-rad){ p.y = BY+BS-rad; p.vy = -Math.abs(p.vy); }
     let dead = false;
-    // 敌方护盾:生命-1 并反弹
+    // 敌方护盾:生命扣当前一半并反弹,碰撞范围按动态半径
     for(const cn of cannons){
       if(cn.alive && shielded(cn) && cn.idx !== p.c){
-        const dx=p.x-cn.x, dy=p.y-cn.y, d2=dx*dx+dy*dy, rr=SHIELD_R+PR;
+        const dx=p.x-cn.x, dy=p.y-cn.y, d2=dx*dx+dy*dy, rr=SHIELD_R+rad;
         if(d2 < rr*rr && d2 > 0.0001){
           const d=Math.sqrt(d2), nx=dx/d, ny=dy/d;
           p.x = cn.x+nx*rr; p.y = cn.y+ny*rr;
@@ -1302,29 +1372,36 @@ function updatePierce(h){
           hitShield(cn);
           spark(p.x, p.y, TEAMS[p.c].ball);
           if(p.hp <= 0) dead = true;
+          rad = pierceRadius(p);
         }
       }
     }
     // 敌方挡板:贯穿弹扣当前一半血,挡板扣相同值(≤0 破坏),反弹
     if(!dead){
       const loss = Math.ceil(p.hp/2);
-      const hcn = guardHit(p.x, p.y, p.c, PR, loss);
+      const hcn = guardHit(p.x, p.y, p.c, rad, loss);
       if(hcn){
         const dx=p.x-hcn.x, dy=p.y-hcn.y, d=Math.hypot(dx,dy)||1, nx=dx/d, ny=dy/d;
-        const out2 = GUARD_RAD+GUARD_THICK+PR+0.5;
+        p.hp -= loss; spark(p.x, p.y, TEAMS[p.c].ball);
+        rad = pierceRadius(p);
+        const out2 = GUARD_RAD+GUARD_THICK+rad+0.5;
         p.x = hcn.x+nx*out2; p.y = hcn.y+ny*out2;
         const dot = p.vx*nx + p.vy*ny;
         if(dot < 0){ p.vx -= 2*dot*nx; p.vy -= 2*dot*ny; }
-        p.hp -= loss; spark(p.x, p.y, TEAMS[p.c].ball);
         if(p.hp <= 0) dead = true;
       }
     }
-    // 敌方炮台:造成剩余生命值的伤害后消失
+    // 可以撞普通小球:双方互拼生命,归零/小于0则移除
+    if(!dead){
+      dead = collideSkillWithMarbles(p, rad);
+      rad = pierceRadius(p);
+    }
+    // 敌方炮台:造成剩余生命值的伤害后消失,碰撞范围按动态半径
     if(!dead){
       for(const cn of cannons){
         if(!cn.alive || cn.idx === p.c || shielded(cn)) continue;
         const dx=p.x-cn.x, dy=p.y-cn.y;
-        if(dx*dx+dy*dy < (28+PR)*(28+PR)){
+        if(dx*dx+dy*dy < (28+rad)*(28+rad)){
           explosion(p.x, p.y, TEAMS[p.c].ball, 40, 300);
           toast('💥 贯穿弹命中 ' + TEAMS[cn.idx].name + ' (-' + fmt(p.hp) + ' HP)', TEAMS[p.c].ball);
           applyDamage(cn, p.hp, p.c);
@@ -1333,26 +1410,19 @@ function updatePierce(h){
         }
       }
     }
-    // 沿路径啃格子:每点格子生命消耗 1 点贯穿弹生命
+    // 沿路径啃格子:按当前大小边缘扫过的所有格子结算,不再只看中心点
     if(!dead){
-      const dx=p.x-px0, dy=p.y-py0, d=Math.hypot(dx,dy);
-      const steps = Math.max(1, Math.ceil(d/(CS*0.7)));
-      let lci=-1,lcj=-1;
-      for(let s=1;s<=steps;s++){
-        const xx = px0 + dx*s/steps, yy = py0 + dy*s/steps;
-        const ci = ((xx-BX)/CS)|0, cj = ((yy-BY)/CS)|0;
-        if(ci<0 || cj<0 || ci>=N || cj>=N) continue;
-        if(ci===lci&&cj===lcj) continue; lci=ci; lcj=cj;
-        if(cells[cj*N+ci] !== p.c){
-          const cellLife = cellHp[cj*N+ci];
-          if(p.hp >= cellLife){
-            p.hp -= cellLife; setCell(ci, cj, p.c, 1);
-          } else {
-            cellHp[cj*N+ci] -= p.hp; drawCell(ci,cj,cells[cj*N+ci]); p.hp = 0;
-          }
-          if(p.hp <= 0){ p.x = xx; p.y = yy; spark(xx, yy, TEAMS[p.c].ball); dead = true; break; }
+      dead = eachSweptCell(px0, py0, p.x, p.y, rad, (ci, cj, xx, yy) => {
+        if(cells[cj*N+ci] === p.c) return false;
+        const cellLife = cellHp[cj*N+ci];
+        if(p.hp >= cellLife){
+          p.hp -= cellLife; setCell(ci, cj, p.c, 1);
+        } else {
+          cellHp[cj*N+ci] -= p.hp; drawCell(ci,cj,cells[cj*N+ci]); p.hp = 0;
         }
-      }
+        if(p.hp <= 0){ p.x = xx; p.y = yy; spark(xx, yy, TEAMS[p.c].ball); return true; }
+        return false;
+      });
     }
     if(dead) continue;
     out.push(p);
@@ -1447,16 +1517,17 @@ function drawMarbles(){
 function drawPierce(){
   for(const p of pierceBalls){
     const tm = TEAMS[p.c];
+    const r = pierceRadius(p);
     ctx.fillStyle = tm.ball;
-    ctx.beginPath(); ctx.arc(p.x, p.y, PR, 0, 6.283); ctx.fill();
+    ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 6.283); ctx.fill();
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
     // 球上方显示当前生命值
     ctx.font = 'bold 13px Verdana';
     ctx.textAlign = 'center';
     ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
-    ctx.strokeText(fmt(p.hp), p.x, p.y - PR - 5);
+    ctx.strokeText(fmt(p.hp), p.x, p.y - r - 5);
     ctx.fillStyle = '#fff';
-    ctx.fillText(fmt(p.hp), p.x, p.y - PR - 5);
+    ctx.fillText(fmt(p.hp), p.x, p.y - r - 5);
   }
   ctx.textAlign = 'left';
 }
@@ -1490,20 +1561,21 @@ function drawHoming(){
   for(const b of homingBalls){
     if(b.hp <= 0) continue;
     const tm = TEAMS[b.c];
-    // 箭头朝向 dir
+    const r = homingRadius(b);
+    // 箭头朝向 dir,整体大小随生命值放大
     ctx.save();
     ctx.translate(b.x, b.y); ctx.rotate(b.dir);
     ctx.fillStyle = tm.ball;
     ctx.beginPath();
-    ctx.moveTo(HBR+3, 0); ctx.lineTo(-HBR, HBR*0.8); ctx.lineTo(-HBR*0.4, 0); ctx.lineTo(-HBR, -HBR*0.8);
+    ctx.moveTo(r+3, 0); ctx.lineTo(-r, r*0.8); ctx.lineTo(-r*0.4, 0); ctx.lineTo(-r, -r*0.8);
     ctx.closePath(); ctx.fill();
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
     ctx.restore();
     // 生命值
     ctx.font = 'bold 12px Verdana'; ctx.textAlign = 'center';
     ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
-    ctx.strokeText(fmt(b.hp), b.x, b.y - HBR - 5);
-    ctx.fillStyle = '#fff'; ctx.fillText(fmt(b.hp), b.x, b.y - HBR - 5);
+    ctx.strokeText(fmt(b.hp), b.x, b.y - r - 5);
+    ctx.fillStyle = '#fff'; ctx.fillText(fmt(b.hp), b.x, b.y - r - 5);
   }
   ctx.textAlign = 'left';
 }
