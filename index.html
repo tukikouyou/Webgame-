@@ -174,7 +174,7 @@ const TRAITS = {
   none:   { name:'无',         desc:'没有专属特性。' },
   plinko: { name:'增殖',       desc:'初始面板弹珠 +1;每击杀一个敌方炮台,面板弹珠再 +1;每 10 秒获得等于面板弹珠数的弹药。' },
   dmgshd: { name:'应激护盾',   desc:'每累计受到 50 点伤害,自动开启 10 秒护盾。' },
-  regen:  { name:'背水回血',   desc:'占领格数 < 全场 1/4 时回血:默认每 2 秒回 1 血;生命 < 50% 每秒回 1 血;生命 < 10% 每秒回 2 血。' },
+  regen:  { name:'背水回血',   desc:'占领格数 < 全场 1/4 时回血:默认每 2 秒回 1 血;生命 < 50% 每秒回 1 血;生命 < 25% 每秒回 2 血。' },
   guard:  { name:'环卫',       desc:'炮台周身环绕 4 片旋转扇形挡板,抵消碰到的敌方弹珠;每片挡板有生命值(=本体最大生命80%),被打破后 15 秒满血再生。' },
   cellreg:{ name:'固土',       desc:'每 15 秒,己方所有格子生命值 +1(颜色越深血越厚)。' },
   dblhp:  { name:'重弹',       desc:'发射的小球生命值翻倍;但 RELEASE 时弹药转待发的比率降为 0.5。' },
@@ -350,7 +350,7 @@ function updateCannons(h){
       if(territory(id) < N*N/4){
         const ratio = c.hp / c.maxHp;
         let interval = 2, amount = 1;            // 默认:每 2 秒回 1 血
-        if(ratio < 0.10){ interval = 1; amount = 2; }       // 低于10%:每秒回 2 血
+        if(ratio < 0.25){ interval = 1; amount = 2; }       // 低于25%:每秒回 2 血
         else if(ratio < 0.50){ interval = 1; amount = 1; }  // 低于50%:每秒回 1 血
         c.regenAcc += h;
         if(c.regenAcc >= interval){ c.regenAcc -= interval; c.hp = Math.min(c.maxHp, c.hp+amount); spark(c.x, c.y-30, '#5be05b'); }
@@ -922,9 +922,9 @@ function triggerSkill(b, ang){
     case 4:    // 炸弹:发射炸弹弹珠,碰到不同颜色区域时爆炸
       fireBomb(c);
       break;
-    case 5: {  // 贯穿弹:生命值 = 待发弹药 10%
-      const n = Math.max(1, Math.floor(c.queue*0.10));
+    case 5: {  // 贯穿弹:生命值 = max(10, 待发弹药 10%)
       if(c.queue < 1){ toast(tm.name + ' 无待发弹药,贯穿弹未能发射', tm.ball); break; }
+      const n = Math.max(10, Math.floor(c.queue*0.10));
       c.queue = Math.max(0, c.queue - n);
       const a = c.aim;
       pierceBalls.push({ x:c.x+Math.cos(a)*36, y:c.y+Math.sin(a)*36,
@@ -953,7 +953,7 @@ function enterUltimate(b){
   toast('🌟 ' + TEAMS[b.c].name + ' 进入终极转盘!', TEAMS[b.c].ball);
 }
 function updateUltimate(h){
-  theta2 += h*0.55;
+  theta2 += h*0.75;   // 终极转盘比上方普通转盘(0.55)转得快一点
   for(const fl of segFlashes2) fl.t -= h;
   segFlashes2 = segFlashes2.filter(fl => fl.t > 0);
   const out = [];
@@ -1126,10 +1126,13 @@ const HOMING_SPEED = 50;       // 移速(慢)
 const HOMING_TURN = 0.5;       // 转向速率(弧度/秒)
 const HBR = 9;                 // 追踪弹半径
 function fireHoming(c){
-  const n = Math.max(1, Math.floor(c.queue*0.10));  // 生命 = 待发弹药 10%
+  const tm = TEAMS[c.idx];
+  if(c.queue < 1){ toast(tm.name + ' 无待发弹药,追踪弹未能发射', tm.ball); return; }
+  const n = Math.max(10, Math.floor(c.queue*0.10));  // 生命 = max(10, 待发弹药 10%)
+  c.queue = Math.max(0, c.queue - n);                 // 扣除待发子弹
   const a = c.aim;
   homingBalls.push({ x:c.x+Math.cos(a)*36, y:c.y+Math.sin(a)*36, dir:a, c:c.idx, hp:n });
-  toast('🎯 ' + TEAMS[c.idx].name + ' 发射追踪弹 (HP ' + fmt(n) + ')!', TEAMS[c.idx].ball);
+  toast('🎯 ' + tm.name + ' 发射追踪弹 (HP ' + fmt(n) + ')!', tm.ball);
 }
 function updateHoming(h){
   const out = [];
