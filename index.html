@@ -107,13 +107,14 @@
   +1命(阵亡时满血复活并获 20 秒护盾,弹药与场上弹珠清零,可叠加)/
   核弹(碰到异色区域引爆,缓慢扩散的冲击波吞噬范围内其他颜色的所有小球,但不改变网格颜色)/
   底弹+1(RELEASE 后的弹药底数 +1,可累加)。
-  新增专属特性:固土(每 15 秒己方格子生命 +1)、重弹(小球生命翻倍但 RELEASE 转换比率降为 0.5)、
+  每局画面上方会显示计时器;每过 3 分钟,所有仍存活炮台的左侧面板循环小球 +1。
+  新增专属特性:固土(每 15 秒己方格子生命 +1,最高 5)、重弹(基础弹药 4;发射生命最高 20 的重型子弹,每发消耗最多 20 点待发子弹数)、
   游牧(炮台极缓慢在己方领土漂移,撞非己方格扣血占领并反弹)、磁场(弱磁场排斥接近的敌方弹珠,对炸弹/核弹减半)、
-  相位(己方弹珠无阻力、可与敌方弹珠互撞抵消生命、撞墙小概率变向)。
+  相位(己方普通子弹速度 ×1.5、无普通阻力、磁场影响仅 10%、发射的贯穿弹/追踪弹碰撞作用力仅 10%,碰撞冲量会真实改变速度,撞墙小概率变向)。
   面板小球为循环制:每色 2 颗起步,落入底部槽位后回到顶部重新下落。
   <b>RPG:</b>每格有生命值(默认 1),弹珠也有生命值(默认 1)。弹珠撞到异色格子时双方互拼生命,每点抵 1 点;
   格子生命归零才翻色(并重置为 1 血),弹珠生命归零则消失——生命值越高的格子越暗,像一层层护甲。
-  开局可为每个炮台选<b>专属特性</b>(增殖 / 应激护盾 / 背水回血 / 环卫挡板),顶栏"🛠 调试面板"可实时改动所有数值。
+  开局可为每个炮台选<b>专属特性</b>(增殖[每 2 分钟面板小球 +1] / 应激护盾 / 背水回血[占领低于 1/4 时按最大生命百分比回血] / 环卫挡板等),顶栏"🛠 调试面板"可实时改动所有数值。
   炮台 100 血,归零爆炸淘汰(有额外生命则满血复活),活到最后的颜色获胜。
 </footer>
 <script>
@@ -167,19 +168,25 @@ const TEAMS = [
   { name:'粉色', ball:'#ff45d2', cell:'#f3a0e3', corner:[1,1] },
 ];
 const NEUTRAL = '#9c9c9c';
+const GLOBAL_PLINKO_INTERVAL = 180;  // 每 3 分钟,所有存活炮台各 +1 面板循环小球
+const TRAIT_PLINKO_INTERVAL = 120;   // 增殖专属:每 2 分钟额外 +1 面板循环小球
+const HEAVY_SHOT_COST = 20;          // 重弹:每次发射最多消耗 20 点待发子弹数
+const HEAVY_SHOT_R = MR * 1.65;      // 重弹:重型子弹显示半径
+const SKILL_COLLISION_FORCE = 1.15;   // 技能弹与小球碰撞时,把相向速度转换为真实速度冲量的系数
+const PHASE_FORCE_FACTOR = 0.1;       // 相位专属:磁场/技能弹碰撞作用力仅保留 10%
 
 /* ---------- 专属特性表 ---------- */
 const TRAITS = {
   none:   { name:'无',         desc:'没有专属特性。' },
-  plinko: { name:'增殖',       desc:'初始面板弹珠 +1;每击杀一个敌方炮台,面板弹珠再 +1;每 10 秒获得等于面板弹珠数的弹药。' },
+  plinko: { name:'增殖',       desc:'每 2 分钟自动获得 1 个左侧面板循环小球。' },
   dmgshd: { name:'应激护盾',   desc:'每累计受到 50 点伤害,自动开启 10 秒护盾。' },
-  regen:  { name:'背水回血',   desc:'占领格数 < 全场 1/4 时回血:默认每 2 秒回 1 血;生命 < 50% 每秒回 1 血;生命 < 25% 每秒回 2 血。' },
+  regen:  { name:'背水回血',   desc:'初始生命值与生命上限 +100;占领格数 < 全场 1/4 时按最大生命百分比回血:默认每 2 秒回 1%;生命 < 50% 每 1 秒回 1%;生命 < 25% 每 1 秒回 2%。' },
   guard:  { name:'环卫',       desc:'炮台周身环绕 4 片旋转扇形挡板,抵消碰到的敌方弹珠;每片挡板有生命值(=本体最大生命80%),被打破后 15 秒满血再生。' },
-  cellreg:{ name:'固土',       desc:'每 15 秒,己方所有格子生命值 +1(颜色越深血越厚)。' },
-  dblhp:  { name:'重弹',       desc:'发射的小球生命值翻倍;但 RELEASE 时弹药转待发的比率降为 0.5。' },
+  cellreg:{ name:'固土',       desc:'每 15 秒,己方所有格子生命值 +1,最高 2(颜色越深血越厚)。' },
+  dblhp:  { name:'重弹',       desc:'基础弹药为 4;发射重型子弹,每次消耗最多 20 点待发子弹数,子弹生命值等于本次消耗值(满额为 20)。' },
   nomad:  { name:'游牧',       desc:'炮台极缓慢地在己方领土漂移;遇到非己方格子会扣其 1 血、占领并反弹。' },
   magnet: { name:'磁场',       desc:'炮台周围有弱磁场,轻微排斥接近的敌方弹珠(对炸弹、核弹效果减半)。' },
-  phase:  { name:'相位',       desc:'己方普通弹珠无阻力,可与敌方弹珠碰撞抵消生命;撞墙有小概率改变角度。' },
+  phase:  { name:'相位',       desc:'己方普通子弹速度 ×1.5、无普通阻力;磁场影响仅为 10%;发射的贯穿弹/追踪弹受小球碰撞作用力仅为 10%;撞墙有小概率改变角度。' },
 };
 const TRAIT_KEYS = Object.keys(TRAITS);
 
@@ -208,6 +215,15 @@ function fmt(n){
   if(n >= 1e6) return (n/1e6).toFixed(1) + 'M';
   if(n >= 1e4) return Math.round(n/1e3) + 'k';
   return '' + n;
+}
+function fmtTime(sec){
+  sec = Math.max(0, Math.floor(sec));
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
+function fmtHp(n){
+  return Number.isInteger(n) ? '' + n : n.toFixed(1);
 }
 function norm(a){ a %= Math.PI*2; if(a < 0) a += Math.PI*2; return a; }
 
@@ -249,10 +265,10 @@ function paintCell(i, j, o){
 
 /* ===== §STATE 全局状态 + reset() 初始化 ===== */
 let cannons, marbles, counts, plinkoBalls, wheelBalls, pierceBalls, bombBalls, nukeBalls, homingBalls, ultraBalls, shockwaves, waves, particles, toasts, flashes, segFlashes, segFlashes2;
-let t, spawnTimer, rrIdx, theta, theta2, pegTheta, plusVal, gameOver, winner, winTimer, confettiT;
+let t, matchTime, globalPlinkoAcc, spawnTimer, rrIdx, theta, theta2, pegTheta, plusVal, gameOver, winner, winTimer, confettiT;
 
 function reset(){
-  t=0; spawnTimer=0; rrIdx=0; theta=0; theta2=0; pegTheta=0;
+  t=0; matchTime=0; globalPlinkoAcc=0; spawnTimer=0; rrIdx=0; theta=0; theta2=0; pegTheta=0;
   plusVal=1; LABELS[0]='+1';
   gameOver=false; winner=null; winTimer=0; confettiT=0;
   marbles=[]; plinkoBalls=[]; wheelBalls=[]; pierceBalls=[]; bombBalls=[]; nukeBalls=[]; homingBalls=[]; ultraBalls=[]; shockwaves=[]; waves=[];
@@ -278,27 +294,30 @@ function reset(){
     const ci = tm.corner[0] ? N-1-off : off;
     const cj = tm.corner[1] ? N-1-off : off;
     const x = BX + (ci+0.5)*CS, y = BY + (cj+0.5)*CS;
-    const c = { idx, x, y, hp:MAX_HP, maxHp:MAX_HP, shield:0, shieldHp:0, lives:0, purge:false,
-             ammo:1, queue:10, fireAcc:0, dmgCd:0, alive:true,
-             trait:CFG.trait[idx],          // 专属特性
+    const trait = CFG.trait[idx];
+    const startMaxHp = MAX_HP + (trait === 'regen' ? 100 : 0); // 背水回血:开局生命上限 +100
+    const startBaseAmmo = trait === 'dblhp' ? 4 : 1;           // 重弹:基础弹药为 4
+    const c = { idx, x, y, hp:startMaxHp, maxHp:startMaxHp, shield:0, shieldHp:0, lives:0, purge:false,
+             ammo:startBaseAmmo, queue:10, fireAcc:0, dmgCd:0, alive:true,
+             trait,                         // 专属特性
              dmgTaken:0,                     // 累计受伤(护盾特性用)
              regenAcc:0,                     // 回血计时(逆境回血特性用)
-             cellRegAcc:0,                   // 固土计时(格子+血特性用)
-             plinkoAcc:0,                    // 增殖计时(每2秒获弹药特性用)
+             cellRegAcc:0,                   // 固土计时(格子+血特性用,最高 5)
+             plinkoAcc:0,                    // 增殖计时(每 2 分钟 +1 面板小球)
              nomadDir:Math.random()*6.283,   // 游牧漂移方向
              guards:[],                      // 环绕防御挡板
              phase:Math.random()*6.283,
              base:Math.atan2(BY+BS/2 - y, BX+BS/2 - x), aim:0,
-             baseAmmo:1,                     // RELEASE 后弹药重置底数(终极技能可加)
+             baseAmmo:startBaseAmmo,         // RELEASE 后弹药重置底数(重弹为 4,终极技能可加)
              // 可调参数(调试面板写入,优先于全局默认)
              ammoMul:1 };
     initTrait(c);
     return c;
   });
-  // 弹珠面板:每色初始小球(受 +1 弹珠特性影响)
+  // 弹珠面板:每色初始 2 颗循环小球;后续由全局 3 分钟规则、增殖特性与终极技能增加
   for(let i=0;i<4;i++){
-    const base = 2 + (cannons[i].trait === 'plinko' ? 1 : 0);
-    for(let n=0;n<base;n++) plinkoBalls.push(newPlinkoBall(i));
+    const base = 2;
+    for(let n=0;n<base;n++) addPanelBall(i, false);
   }
 }
 // ---- 专属特性初始化 ----
@@ -331,8 +350,14 @@ function updateCannons(h){
     while(c.fireAcc >= 1 && c.queue > 0){
       c.fireAcc -= 1;
       if(counts[id] >= MARBLE_CAP) break;
-      c.queue--;
-      fireMarble(c);
+      if(c.trait === 'dblhp'){
+        const shotHp = Math.max(1, Math.min(HEAVY_SHOT_COST, c.queue));
+        c.queue -= shotHp;
+        fireMarble(c, shotHp);
+      } else {
+        c.queue--;
+        fireMarble(c);
+      }
     }
     if(c.fireAcc > 3) c.fireAcc = 3;
     // 环卫:挡板缓慢旋转;被破坏的挡板计时再生(满血,按当前最大生命重算)
@@ -344,35 +369,40 @@ function updateCannons(h){
           spark(c.x, c.y, TEAMS[id].ball); }
       }
     }
-    // 背水回血:占领 < 1/4 全场时回血;生命越低回得越快
+    // 背水回血:开局生命上限 +100;占领 < 1/4 全场时按最大生命百分比回血;生命越低回得越快
     if(c.trait === 'regen' && c.hp < c.maxHp){
       if(territory(id) < N*N/4){
         const ratio = c.hp / c.maxHp;
-        let interval = 2, amount = 1;            // 默认:每 2 秒回 1 血
-        if(ratio < 0.25){ interval = 1; amount = 2; }       // 低于25%:每秒回 2 血
-        else if(ratio < 0.50){ interval = 1; amount = 1; }  // 低于50%:每秒回 1 血
+        let interval = 2, healPct = 0.01;          // 默认:每 2 秒回 1% 最大生命
+        if(ratio < 0.25){ interval = 1; healPct = 0.02; }       // 低于25%:每秒回 2% 最大生命
+        else if(ratio < 0.50){ interval = 1; healPct = 0.01; }  // 低于50%:每秒回 1% 最大生命
         c.regenAcc += h;
-        if(c.regenAcc >= interval){ c.regenAcc -= interval; c.hp = Math.min(c.maxHp, c.hp+amount); spark(c.x, c.y-30, '#5be05b'); }
+        while(c.regenAcc >= interval && c.hp < c.maxHp){
+          c.regenAcc -= interval;
+          c.hp = Math.min(c.maxHp, c.hp + c.maxHp * healPct);
+          spark(c.x, c.y-30, '#5be05b');
+        }
       } else c.regenAcc = 0;
     }
-    // 固土:每 15 秒己方所有格子生命 +1
+    // 固土:每 15 秒己方所有格子生命 +1,最高 2
     if(c.trait === 'cellreg'){
       c.cellRegAcc += h;
       if(c.cellRegAcc >= 15){
         c.cellRegAcc -= 15;
         for(let k=0;k<cells.length;k++){
-          if(cells[k] === id){ cellHp[k]++; drawCell(k%N, (k/N)|0, id); }
+          if(cells[k] === id && cellHp[k] < 2){ cellHp[k]++; drawCell(k%N, (k/N)|0, id); }
         }
-        toast('🧱 ' + TEAMS[id].name + ' 固土:全域格子 +1 生命', TEAMS[id].ball);
+        toast('🧱 ' + TEAMS[id].name + ' 固土:全域格子 +1 生命(最高 2)', TEAMS[id].ball);
       }
     }
-    // 增殖:每 10 秒获得 = 面板弹珠数 的弹药
+    // 增殖:每 2 分钟额外获得 1 个左侧面板循环小球
     if(c.trait === 'plinko'){
       c.plinkoAcc += h;
-      if(c.plinkoAcc >= 10){
-        c.plinkoAcc -= 10;
-        let n = 0; for(const b of plinkoBalls) if(b.c === id) n++;
-        if(n > 0){ c.ammo = Math.min(AMMO_CAP, c.ammo + n); spark(c.x, c.y-30, TEAMS[id].ball); }
+      while(c.plinkoAcc >= TRAIT_PLINKO_INTERVAL){
+        c.plinkoAcc -= TRAIT_PLINKO_INTERVAL;
+        addPanelBall(id);
+        toast('🧬 ' + TEAMS[id].name + ' 增殖:面板小球 +1', TEAMS[id].ball);
+        spark(c.x, c.y-30, TEAMS[id].ball);
       }
     }
     // 游牧:极缓慢漂移,遇非己方格子→扣血占领并反弹
@@ -411,13 +441,16 @@ function territory(id){    // 统计某色占领格数(缓存,每帧最多算一
   }
   return territory._c[id];
 }
-function fireMarble(c){
+function fireMarble(c, hpOverride){
   const id = c.idx;
-  const a = c.aim + rand(-0.06, 0.06), sp = rand(CFG.spMin[id], CFG.spMax[id]);
-  let hp = CFG.marbleDmg[id];
-  if(c.trait === 'dblhp') hp *= 2;        // 重弹:小球生命翻倍
+  const a = c.aim + rand(-0.06, 0.06);
+  let sp = rand(CFG.spMin[id], CFG.spMax[id]);
+  if(c.trait === 'phase') sp *= 1.5;     // 相位:普通子弹速度 ×1.5
+  const heavy = c.trait === 'dblhp';
+  const hp = hpOverride == null ? CFG.marbleDmg[id] : hpOverride;
+  const r = heavy ? HEAVY_SHOT_R : MR;
   marbles.push({ x:c.x+Math.cos(a)*30, y:c.y+Math.sin(a)*30,
-                 vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, c:id, hp });
+                 vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, c:id, hp, r, heavy });
   counts[id]++;
 }
 function applyDamage(c, dmg, attacker){   // 统一伤害入口:触发应激护盾特性
@@ -466,8 +499,8 @@ function guardHit(x, y, atkColor, rad, dmg){
   }
   return null;
 }
-const MAGNET_R = 65;        // 磁场作用半径
-const MAGNET_FORCE = 500;  // 磁场推力强度
+const MAGNET_R = 70;        // 磁场作用半径
+const MAGNET_FORCE = 400;  // 磁场推力强度
 // 对一个带 vx/vy 的弹体施加敌方磁场排斥;scale<1 用于削弱大型弹珠
 function applyMagnet(obj, h, scale){
   for(const cn of cannons){
@@ -475,9 +508,19 @@ function applyMagnet(obj, h, scale){
     const dx = obj.x-cn.x, dy = obj.y-cn.y, d = Math.hypot(dx,dy);
     if(d > MAGNET_R || d < 1) continue;
     const f = MAGNET_FORCE * scale * (1 - d/MAGNET_R) / d * h;   // 越近越强
-    obj.vx += dx*f; obj.vy += dy*f;
+    if(obj.dir != null){
+      let sp = obj.speed == null ? HOMING_SPEED : obj.speed;
+      let vx = Math.cos(obj.dir)*sp + dx*f;
+      let vy = Math.sin(obj.dir)*sp + dy*f;
+      sp = Math.hypot(vx, vy);
+      if(sp > 0.001){ obj.dir = Math.atan2(vy, vx); obj.speed = Math.min(HOMING_SPEED_MAX, sp); }
+    } else {
+      obj.vx += dx*f; obj.vy += dy*f;
+    }
   }
 }
+function isPhaseOwner(color){ return cannons[color] && cannons[color].trait === 'phase'; }
+function phaseScale(color){ return isPhaseOwner(color) ? PHASE_FORCE_FACTOR : 1; }
 function updateMarbles(h){
   // 复活炮台的"清场"延迟处理(避免循环中过滤被覆盖)
   for(const c of cannons){
@@ -497,20 +540,21 @@ function updateMarbles(h){
       const damp = Math.pow(CFG.damp[m.c], h);
       m.vx *= damp; m.vy *= damp;
     }
-    applyMagnet(m, h, 1);               // 敌方磁场排斥(普通弹珠全额)
+    applyMagnet(m, h, phaseScale(m.c));  // 相位普通子弹受到的磁场影响仅 10%
+    const r = m.r || MR;
     const px = m.x, py = m.y;
     m.x += m.vx*h; m.y += m.vy*h;
     // 撞墙反弹(相位弹珠撞墙有 25% 概率改变角度)
-    if(m.x < BX+MR){ m.x = BX+MR; m.vx =  Math.abs(m.vx); if(isPhase) phaseWallKick(m); }
-    else if(m.x > BX+BS-MR){ m.x = BX+BS-MR; m.vx = -Math.abs(m.vx); if(isPhase) phaseWallKick(m); }
-    if(m.y < BY+MR){ m.y = BY+MR; m.vy =  Math.abs(m.vy); if(isPhase) phaseWallKick(m); }
-    else if(m.y > BY+BS-MR){ m.y = BY+BS-MR; m.vy = -Math.abs(m.vy); if(isPhase) phaseWallKick(m); }
+    if(m.x < BX+r){ m.x = BX+r; m.vx =  Math.abs(m.vx); if(isPhase) phaseWallKick(m); }
+    else if(m.x > BX+BS-r){ m.x = BX+BS-r; m.vx = -Math.abs(m.vx); if(isPhase) phaseWallKick(m); }
+    if(m.y < BY+r){ m.y = BY+r; m.vy =  Math.abs(m.vy); if(isPhase) phaseWallKick(m); }
+    else if(m.y > BY+BS-r){ m.y = BY+BS-r; m.vy = -Math.abs(m.vy); if(isPhase) phaseWallKick(m); }
     // 敌方护盾:碰到即消失(永久护盾同时扣 1 点护盾值)
     let dead = false;
     for(const cn of cannons){
       if(cn.alive && shielded(cn) && cn.idx !== m.c){
         const ax = m.x-cn.x, ay = m.y-cn.y;
-        if(ax*ax+ay*ay < (SHIELD_R+MR)*(SHIELD_R+MR)){
+        if(ax*ax+ay*ay < (SHIELD_R+r)*(SHIELD_R+r)){
           dead = true;
           hitShield(cn);
           spark(m.x, m.y, TEAMS[m.c].ball);
@@ -519,7 +563,7 @@ function updateMarbles(h){
       }
     }
     // 敌方环卫挡板:抵消弹珠(弹珠消失),并对挡板扣 = 弹珠生命 的血
-    if(!dead && guardHit(m.x, m.y, m.c, MR, Math.max(1, m.hp))){
+    if(!dead && guardHit(m.x, m.y, m.c, r, Math.max(1, m.hp))){
       dead = true; spark(m.x, m.y, TEAMS[m.c].ball);
     }
     // 沿路径检查:碰到第一个非己方格子 → 攻击格子(扣血),格子破→染色;弹珠扣血,归零消失
@@ -570,8 +614,7 @@ function updateMarbles(h){
         }
       }
     }
-    const sp2 = m.vx*m.vx + m.vy*m.vy;
-    if(dead || (!isPhase && sp2 < 25*25)){ counts[m.c]--; continue; }  // 相位弹珠不因低速清理
+    if(dead){ counts[m.c]--; continue; }  // 取消低速清理:普通弹珠不再因为速度过低而自动消失
     out.push(m);
   }
   marbles = out;
@@ -678,14 +721,6 @@ function onLethal(c, attacker){
     toast('🔁 ' + TEAMS[c.idx].name + ' 消耗一条生命复活!(剩余 ' + c.lives + ' 条)', TEAMS[c.idx].ball);
   } else {
     eliminate(c);
-    // 击杀奖励:凶手若带"增殖"特性,面板弹珠 +1
-    if(attacker != null && attacker !== c.idx){
-      const k = cannons[attacker];
-      if(k && k.alive && k.trait === 'plinko'){
-        plinkoBalls.push(newPlinkoBall(attacker));
-        toast('☠ ' + TEAMS[attacker].name + ' 击杀奖励:面板弹珠 +1!', TEAMS[attacker].ball);
-      }
-    }
   }
 }
 function eliminate(c){
@@ -716,7 +751,7 @@ function checkWin(h){
    §PLINKO 功能区 2:左上弹珠面板  RELEASE / MULTIPLY / SPIN
    ============================================================ */
 const PX=14, PY=14, PW=336, PH=690, SLOT_H=46, PBR=7;
-const SLOT_RAMP = 600;   // RELEASE→MULTIPLY 宽度过渡所需秒数
+const SLOT_RAMP = 360;   // RELEASE→MULTIPLY 宽度过渡所需秒数
 // 槽位边界:开局 RELEASE/MULTIPLY 各 0.40,随时间过渡到 0.16/0.64(=1:4),SPIN 固定 0.20
 function slotBounds(){
   const k = Math.min(1, t/SLOT_RAMP);
@@ -736,6 +771,27 @@ function newPlinkoBall(c){
 }
 // 小球落到底部后回顶部重新下落:复用初始化逻辑,保留原颜色
 function respawnPlinko(b){ Object.assign(b, newPlinkoBall(b.c)); }
+// 给左侧面板增加一个指定颜色的循环小球;showFx=false 用于重置初始化,避免刷屏提示
+function addPanelBall(ci, showFx){
+  const c = cannons && cannons[ci];
+  if(c && !c.alive) return false;
+  plinkoBalls.push(newPlinkoBall(ci));
+  if(showFx !== false && c){
+    spark(c.x, c.y-30, TEAMS[ci].ball);
+  }
+  return true;
+}
+function updateRoundPlinkoGifts(h){
+  globalPlinkoAcc += h;
+  while(globalPlinkoAcc >= GLOBAL_PLINKO_INTERVAL){
+    globalPlinkoAcc -= GLOBAL_PLINKO_INTERVAL;
+    let n = 0;
+    for(const c of cannons){
+      if(c.alive && addPanelBall(c.idx)) n++;
+    }
+    if(n > 0) toast('⏱ 每 3 分钟奖励:存活炮台面板小球 +1', '#ffffff');
+  }
+}
 function updatePlinko(h){
   const out = [];
   for(const b of plinkoBalls){
@@ -773,11 +829,13 @@ function slotEffect(ci, slot){
     c.ammo = Math.min(AMMO_CAP, c.ammo*2);
     toast(tm.name + ' 弹药 ×2 → ' + fmt(c.ammo), tm.ball);
     flash(1);
-  } else if(slot === 0){                            // RELEASE:全部发射
-    const ratio = (c.trait === 'dblhp') ? 0.5 : 1;  // 重弹:转换比率 0.5
-    const n = Math.floor(c.ammo * ratio);
+  } else if(slot === 0){                            // RELEASE:把当前弹药全部转入待发子弹数
+    const n = Math.floor(c.ammo);
     c.queue += n; c.ammo = c.baseAmmo;
-    toast(tm.name + ' 发射 ' + fmt(n) + ' 发!', tm.ball);
+    const msg = c.trait === 'dblhp'
+      ? tm.name + ' 装填重型待发 ' + fmt(n) + ' 点!'
+      : tm.name + ' 发射 ' + fmt(n) + ' 发!';
+    toast(msg, tm.ball);
     flash(0);
   } else {                                          // SPIN:进入技能转盘
     wheelBalls.push({ x:WX+rand(-30,30), y:WY-IR*0.6,
@@ -1135,7 +1193,9 @@ function bombAt(ci, tx, ty){
 }
 
 /* ---------- 技能:追踪弹 ---------- */
-const HOMING_SPEED = 30;       // 移速(慢)
+const HOMING_SPEED = 30;       // 追踪弹初始移速(慢)
+const HOMING_ACCEL = 3.0;      // 追踪弹极缓慢向前加速(像素/秒²)
+const HOMING_SPEED_MAX = 90;   // 追踪弹最高移速
 const HOMING_TURN = 0.5;       // 转向速率(弧度/秒)
 const HBR = 9;                 // 追踪弹半径
 
@@ -1178,20 +1238,78 @@ function eachSweptCell(x0, y0, x1, y1, r, fn){
   }
   return false;
 }
-// 技能弹与普通小球互拼生命:双方各扣掉对方当前生命值,归零/小于 0 的一方移除
+// 技能弹与普通小球互拼生命:双方扣血;幸存者会把碰撞冲量真正写回 vx/vy 或 dir/speed
+function objVelocity(obj){
+  if(obj.dir != null){
+    const sp = obj.speed == null ? HOMING_SPEED : obj.speed;
+    return { vx:Math.cos(obj.dir)*sp, vy:Math.sin(obj.dir)*sp };
+  }
+  return { vx:obj.vx || 0, vy:obj.vy || 0 };
+}
+function setSkillObjVelocity(obj, vx, vy){
+  if(obj.dir != null){
+    const sp = Math.hypot(vx, vy);
+    obj.speed = Math.min(HOMING_SPEED_MAX, sp);
+    // 追踪弹速度被撞到接近 0 时,保留原朝向,避免 atan2(0,0) 造成方向抖动
+    if(sp > 0.001) obj.dir = Math.atan2(vy, vx);
+  } else {
+    obj.vx = vx;
+    obj.vy = vy;
+  }
+}
 function collideSkillWithMarbles(obj, r){
-  let hit = false;
   const deadMarbles = [];
   for(const m of marbles){
     if(m.c === obj.c || m.hp <= 0) continue;
-    const dx = obj.x - m.x, dy = obj.y - m.y;
-    const rr = r + MR;
-    if(dx*dx + dy*dy < rr*rr){
+    const mr = m.r || MR;
+    let dx = obj.x - m.x, dy = obj.y - m.y;
+    const rr = r + mr;
+    let d2 = dx*dx + dy*dy;
+    if(d2 < rr*rr){
+      const preObjHp = Math.max(0.0001, obj.hp);
+      const preMhp = Math.max(0.0001, m.hp);
+      const objV = objVelocity(obj);
+      const marbleVx = m.vx || 0, marbleVy = m.vy || 0;
       const loss = Math.min(obj.hp, m.hp);
       obj.hp -= loss;
       m.hp -= loss;
-      hit = true;
+
+      // 法线 nx/ny 指向“普通小球 → 技能弹”。完全重叠时用相对运动方向反推法线。
+      if(d2 < 0.0001){
+        dx = marbleVx - objV.vx;
+        dy = marbleVy - objV.vy;
+        d2 = dx*dx + dy*dy;
+        if(d2 < 0.0001){ dx = objV.vx || 1; dy = objV.vy || 0; d2 = dx*dx + dy*dy; }
+      }
+      const d = Math.sqrt(d2);
+      const nx = dx/d, ny = dy/d;
+
+      // 只取碰撞法线方向上的“相向速度”:正面对撞/追尾会产生冲量,同向或远离时不会凭空弹开。
+      const closingSpeed = Math.max(0, (marbleVx - objV.vx)*nx + (marbleVy - objV.vy)*ny);
+      const hpRatio = Math.min(preObjHp, preMhp) / Math.max(preObjHp, preMhp);
+      const invObjMass = obj.hp > 0 ? 1 / preObjHp : 0;
+      const invMarbleMass = m.hp > 0 ? 1 / preMhp : 0;
+      const invMassSum = invObjMass + invMarbleMass;
+      const impulse = invMassSum > 0
+        ? closingSpeed * SKILL_COLLISION_FORCE * hpRatio * phaseScale(obj.c) / invMassSum
+        : 0;  // 相位发射的贯穿弹/追踪弹作用力 ×0.1
+
+      if(impulse > 0){
+        // 真实速度响应:大血量相当于更重,速度变化小;小血量更容易被撞停/弹回。
+        if(obj.hp > 0){
+          setSkillObjVelocity(obj,
+            objV.vx + nx * impulse * invObjMass,
+            objV.vy + ny * impulse * invObjMass
+          );
+        }
+        if(m.hp > 0){
+          m.vx = marbleVx - nx * impulse * invMarbleMass;
+          m.vy = marbleVy - ny * impulse * invMarbleMass;
+        }
+      }
       spark((obj.x + m.x)/2, (obj.y + m.y)/2, '#fff');
+      const overlap = rr - d;
+      if(overlap > 0){ obj.x += nx*overlap*0.35; obj.y += ny*overlap*0.35; m.x -= nx*overlap*0.35; m.y -= ny*overlap*0.35; }
       if(m.hp <= 0) deadMarbles.push(m);
       if(obj.hp <= 0) break;
     }
@@ -1210,7 +1328,7 @@ function fireHoming(c){
   const n = Math.max(10, Math.floor(c.queue*0.10));  // 生命 = max(10, 待发弹药 10%),保底 10
   c.queue = Math.max(0, c.queue - n);                 // 扣除待发子弹(不足则清零)
   const a = c.aim;
-  homingBalls.push({ x:c.x+Math.cos(a)*36, y:c.y+Math.sin(a)*36, dir:a, c:c.idx, hp:n });
+  homingBalls.push({ x:c.x+Math.cos(a)*36, y:c.y+Math.sin(a)*36, dir:a, speed:HOMING_SPEED, c:c.idx, hp:n });
   toast('🎯 ' + tm.name + ' 发射追踪弹 (HP ' + fmt(n) + ')!', tm.ball);
 }
 function updateHoming(h){
@@ -1232,9 +1350,11 @@ function updateHoming(h){
       const turn = Math.max(-HOMING_TURN*h, Math.min(HOMING_TURN*h, diff));
       b.dir += turn;
     }
+    applyMagnet(b, h, 0.5 * phaseScale(b.c));   // 大型追踪弹受磁场;相位仅 10%
+    b.speed = Math.min(HOMING_SPEED_MAX, (b.speed == null ? HOMING_SPEED : b.speed) + HOMING_ACCEL*h); // 极缓慢提升向前速度
     const px0=b.x, py0=b.y;
-    b.x += Math.cos(b.dir)*HOMING_SPEED*h;
-    b.y += Math.sin(b.dir)*HOMING_SPEED*h;
+    b.x += Math.cos(b.dir)*b.speed*h;
+    b.y += Math.sin(b.dir)*b.speed*h;
     // 边界反弹:按当前动态半径贴边
     if(b.x < BX+rad){ b.x=BX+rad; b.dir=Math.PI-b.dir; }
     else if(b.x > BX+BS-rad){ b.x=BX+BS-rad; b.dir=Math.PI-b.dir; }
@@ -1370,6 +1490,7 @@ function updatePierce(h){
   for(const p of pierceBalls){
     if(!cannons[p.c].alive) continue;   // 已淘汰颜色的贯穿弹直接清除
     let rad = pierceRadius(p);
+    applyMagnet(p, h, 0.5 * phaseScale(p.c));   // 大型贯穿弹受磁场;相位仅 10%
     const px0 = p.x, py0 = p.y;
     p.x += p.vx*h; p.y += p.vy*h;
     // 撞墙反弹(不减速):按当前动态半径贴边
@@ -1523,6 +1644,7 @@ function render(){
   for(const c of cannons) drawCannon(c);
   drawWaves();
   drawShockwaves();
+  drawTimer();
   drawHUD();
   drawPlinko();
   drawWheel();
@@ -1532,16 +1654,26 @@ function render(){
   if(gameOver) drawOver();
 }
 function drawMarbles(){
-  for(let c=0;c<4;c++){
-    ctx.fillStyle = TEAMS[c].ball;
+  for(const m of marbles){
+    const r = m.r || MR;
+    ctx.fillStyle = TEAMS[m.c].ball;
     ctx.beginPath();
-    for(const m of marbles){
-      if(m.c !== c) continue;
-      ctx.moveTo(m.x+MR, m.y);
-      ctx.arc(m.x, m.y, MR, 0, 6.283);
-    }
+    ctx.arc(m.x, m.y, r, 0, 6.283);
     ctx.fill();
+    if(m.heavy){
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.6;
+      ctx.stroke();
+      ctx.font = 'bold 10px Verdana';
+      ctx.textAlign = 'center';
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 3;
+      ctx.strokeText(fmt(m.hp), m.x, m.y - r - 4);
+      ctx.fillStyle = '#fff';
+      ctx.fillText(fmt(m.hp), m.x, m.y - r - 4);
+    }
   }
+  ctx.textAlign = 'left';
 }
 function drawPierce(){
   for(const p of pierceBalls){
@@ -1718,11 +1850,29 @@ function drawHUD(){
     ctx.fillStyle = tm.ball;
     ctx.font = 'bold 24px Verdana, sans-serif';
     if(!c.alive){ ctx.fillText(tm.name + ' 已淘汰', p.x, p.y+13); continue; }
-    ctx.fillText('HP:' + c.hp + '/' + c.maxHp + (c.lives > 0 ? '  ♥×' + c.lives : ''), p.x, p.y);
+    ctx.fillText('HP:' + fmtHp(c.hp) + '/' + fmtHp(c.maxHp) + (c.lives > 0 ? '  ♥×' + c.lives : ''), p.x, p.y);
     ctx.font = 'bold 18px Verdana, sans-serif';
     ctx.fillText('特性:' + TRAITS[c.trait].name + '  ' + fmt(c.ammo) + ' 弹药 · 待发 ' + fmt(c.queue), p.x, p.y+24);
   }
   ctx.textAlign = 'left';
+}
+function drawTimer(){
+  const txt = '⏱ ' + fmtTime(matchTime);
+  const x = W/2, y = 40;
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 30px Verdana, sans-serif';
+  const tw = ctx.measureText(txt).width;
+  ctx.fillStyle = 'rgba(16,16,20,0.82)';
+  ctx.strokeStyle = '#2a2a30';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(x - tw/2 - 18, y - 28, tw + 36, 44, 10);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(txt, x, y + 6);
+  ctx.restore();
 }
 function drawPlinko(){
   ctx.fillStyle = '#0d0d10';
@@ -1942,6 +2092,8 @@ function drawOver(){
 function step(h){
   t += h;
   if(!gameOver){
+    matchTime += h;
+    updateRoundPlinkoGifts(h);
     updateCannons(h);
     updateMarbles(h);
     updatePierce(h);
@@ -2106,7 +2258,7 @@ function buildDebug(){
     det.appendChild(field('待发子弹', c.queue, 0, 100000, 100, v=>{ c.queue=v; }, fmt));
     det.appendChild(field('炮弹速度↓', CFG.spMin[i], 20, 800, 10, v=>{ CFG.spMin[i]=v; if(CFG.spMax[i]<v)CFG.spMax[i]=v; }));
     det.appendChild(field('炮弹速度↑', CFG.spMax[i], 20, 800, 10, v=>{ CFG.spMax[i]=v; if(CFG.spMin[i]>v)CFG.spMin[i]=v; }));
-    det.appendChild(field('阻力(保留/s)', CFG.damp[i], 0.80, 1.00, 0.005, v=>{ CFG.damp[i]=v; }, v=>v.toFixed(3)));
+    det.appendChild(field('阻力(保留/s)', CFG.damp[i], 0.00, 1.50, 0.005, v=>{ CFG.damp[i]=v; }, v=>v.toFixed(3)));
     det.appendChild(field('摆动幅度', CFG.swing[i], 0, 3.14, 0.05, v=>{ CFG.swing[i]=v; }, v=>v.toFixed(2)));
     det.appendChild(field('射速上限', CFG.fireRateMax[i], 10, 2000, 10, v=>{ CFG.fireRateMax[i]=v; }));
     det.appendChild(field('弹珠伤害', CFG.marbleDmg[i], 1, 100, 1, v=>{ CFG.marbleDmg[i]=v; }));
