@@ -1,0 +1,116 @@
+{
+  "canvas": { "W": 1600, "H": 900 },
+
+  "arena": {
+    "N": 80,
+    "BS": 700,
+    "BX": 450,
+    "BY": 130,
+    "MAX_HP": 100,
+    "AMMO_CAP": 1048576,
+    "MARBLE_CAP": 20000,
+    "MR": 4.5,
+    "SHIELD_R": 45,
+    "initialTerritoryRadiusRatio": 0.20,
+    "cannonOffsetRatio": 0.07,
+    "cannonHitRadius": 28,
+    "cannonDmgCd": 0.03,
+    "fireRateBase": 10,
+    "fireRateQueueFactor": 0.15,
+    "marbleSpawnOffset": 30,
+    "marbleMinSpeed2": 25,
+    "aimSpread": 0.06,
+    "swingFreq": 1.0
+  },
+
+  "projectiles": {
+    "PR": 10,
+    "BBR": 9,
+    "BOMB_RC": 9,
+    "NBR": 11,
+    "NUKE_R": 400,
+    "NUKE_SPEED": 20,
+    "bombSpeed": 160,
+    "nukeSpeed": 160,
+    "pierceSpeed": 140,
+    "SKILL_R_HP_REF": 10,
+    "SKILL_R_GROW": 0.70,
+    "SKILL_R_MAX": 44,
+    "HOMING_SPEED": 30,
+    "HOMING_TURN": 0.5,
+    "HBR": 9,
+    "homingSpeedInit": 140,
+    "projectileSpawnOffset": 36
+  },
+
+  "traitsTuning": {
+    "GUARD_HP_RATIO": 0.8,
+    "GUARD_REGEN": 15,
+    "GUARD_RAD": 36,
+    "GUARD_THICK": 4,
+    "GUARD_SPAN_FACTOR": 0.5,
+    "GUARD_SPIN": 1.4,
+    "NOMAD_SPEED": 15,
+    "NOMAD_SPIN": 1.5,
+    "MAGNET_R": 65,
+    "MAGNET_FORCE": 500,
+    "dmgShieldThreshold": 50,
+    "dmgShieldDuration": 10,
+    "cellRegInterval": 15,
+    "plinkoAmmoInterval": 10,
+    "reviveShield": 20,
+    "regenInterval": 2
+  },
+
+  "plinko": {
+    "PX": 14,
+    "PY": 14,
+    "PW": 336,
+    "PH": 690,
+    "SLOT_H": 46,
+    "PBR": 7,
+    "SLOT_RAMP": 600,
+    "gravity": 1050,
+    "pegRows": 12,
+    "pegRowSpacing": 44,
+    "pegColSpacing": 40,
+    "pegRowTop": 78,
+    "slotRelStart": 0.40,
+    "slotRelEnd": 0.16,
+    "slotSpin": 0.80,
+    "initialBalls": 2
+  },
+
+  "wheel": {
+    "WX": 1408,
+    "WY": 205,
+    "WY2": 570,
+    "WR": 150,
+    "IR": 106,
+    "GAP_HALF": 0.30,
+    "SMALL_SEG": 0.16,
+    "BIG_SEG": 0.48,
+    "STAR_RAMP": 360,
+    "ULT_SEGMENTS": 7,
+    "REG_SEGMENTS": 9,
+    "PEG_OMEGA": -0.9,
+    "gravity": 1000,
+    "wheelSpin": 0.55,
+    "ultimateSpin": 0.75
+  },
+
+  "fx": {
+    "particleCap": 1400,
+    "toastCap": 5,
+    "toastDuration": 2.4,
+    "flashDuration": 0.35,
+    "segFlashDuration": 0.8,
+    "waveSpeed": 900
+  },
+
+  "loop": {
+    "maxDt": 0.05,
+    "subStep": 0.012,
+    "maxSubSteps": 8
+  }
+}

@@ -1,0 +1,6 @@
+[
+  { "name": "橙色", "ball": "#ff9430", "cell": "#e8a45f", "corner": [0, 0] },
+  { "name": "青色", "ball": "#17dede", "cell": "#63d8d8", "corner": [1, 0] },
+  { "name": "紫色", "ball": "#8a3ae0", "cell": "#c2a4ef", "corner": [0, 1] },
+  { "name": "粉色", "ball": "#ff45d2", "cell": "#f3a0e3", "corner": [1, 1] }
+]

@@ -1,0 +1,19 @@
+{
+  "name": "marble",
+  "version": "1.0.0",
+  "description": "弹珠领土战争 — Marble Territory War",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "typescript": "^6.0.3",
+    "vite": "^8.1.2"
+  }
+}

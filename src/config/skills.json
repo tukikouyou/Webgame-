@@ -1,0 +1,13 @@
+{
+  "normal": ["+1", "护盾", "×4", "偷取", "炸弹", "贯穿", "回血", "上限+10", "追踪弹"],
+  "ultimate": ["+弹珠", "上限+50", "盾100", "×10", "+1命", "核弹", "底弹+1"],
+  "defaultTraits": ["plinko", "dmgshd", "regen", "guard"],
+  "cannonDefaults": {
+    "spMin": 90,
+    "spMax": 160,
+    "damp": 0.97,
+    "swing": 1.2,
+    "fireRateMax": 500,
+    "marbleDmg": 1
+  }
+}
