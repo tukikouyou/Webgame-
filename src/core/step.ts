@@ -8,6 +8,7 @@ import { updateWheel } from './wheel';
 import { updateUltimate } from './ultimate';
 import { checkWin } from './damage';
 import { updateParticles, updateWaves, updateToasts } from './fx';
+import { updateEvents } from './events';
 import { TEAMS, W } from '../config/config';
 
 export function step(s: GameState, h: number): void {
@@ -23,6 +24,7 @@ export function step(s: GameState, h: number): void {
     updatePlinko(s, h);
     updateWheel(s, h);
     updateUltimate(s, h);
+    updateEvents(s, h);
     checkWin(s, h);
   } else if (s.winner) {
     s.confettiT -= h;

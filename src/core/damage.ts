@@ -3,12 +3,15 @@ import type { GameState, Cannon, Guard } from './types';
 import { spark, explosion, toast } from './fx';
 import { newPlinkoBall } from './plinko';
 import { norm } from './util';
+import { metaOutMul, metaInMul, useFor } from './meta';
+import { recordElimination } from './wave';
 import {
   TEAMS,
   GUARD_HP_RATIO, GUARD_REGEN, GUARD_RAD, GUARD_THICK, GUARD_SPAN,
   MAGNET_R, MAGNET_FORCE,
   DMG_SHIELD_THRESHOLD, DMG_SHIELD_DURATION, REVIVE_SHIELD,
 } from '../config/config';
+
 
 /* ---- 护盾判定 ---- */
 export function shielded(c: Cannon): boolean { return c.shield > 0 || c.shieldHp > 0; }
@@ -63,9 +66,11 @@ export function applyMagnet(s: GameState, obj: { x: number; y: number; vx: numbe
 
 /* ---- 伤害 / 淘汰 / 胜负 ---- */
 export function applyDamage(s: GameState, c: Cannon, dmg: number, attacker: number | null): void {
-  c.hp -= dmg;
+  // 输出加成看攻击方、承伤减免看承伤方,都只对玩家生效
+  const d = metaInMul(useFor(s, c.idx), metaOutMul(useFor(s, attacker), dmg));
+  c.hp -= d;
   if (c.trait === 'dmgshd') {
-    c.dmgTaken += dmg;
+    c.dmgTaken += d;
     while (c.dmgTaken >= DMG_SHIELD_THRESHOLD) {
       c.dmgTaken -= DMG_SHIELD_THRESHOLD;
       c.shield = Math.max(c.shield, DMG_SHIELD_DURATION);
@@ -86,6 +91,7 @@ export function onLethal(s: GameState, c: Cannon, attacker: number | null): void
     toast(s, '🔁 ' + TEAMS[c.idx].name + ' 消耗一条生命复活!(剩余 ' + c.lives + ' 条)', TEAMS[c.idx].ball);
   } else {
     eliminate(s, c);
+    recordElimination(s, c.idx, attacker);   // 波次/胜负结算(区分玩家击杀/AI互杀)
     if (attacker != null && attacker !== c.idx) {
       const k = s.cannons[attacker];
       if (k && k.alive && k.trait === 'plinko') {

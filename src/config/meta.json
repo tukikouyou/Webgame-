@@ -1,0 +1,38 @@
+{
+  "xpGrow": 1.55,
+  "coinsPerWin": 6,
+  "coinsPerWave": 2,
+  "xpPerWin": 40,
+  "lvDmg": 0.02,
+  "lvFire": 0.01,
+  "maxLevel": 50,
+  "relics": [
+    { "id": "steel",   "name": "钢珠",     "icon": "⚪", "cost": 12, "dmgMul": 1.25,
+      "desc": "弹珠伤害 +25%" },
+    { "id": "turbo",   "name": "涡轮",     "icon": "🌀", "cost": 12, "fireRateMul": 1.15,
+      "desc": "射速上限 +15%" },
+    { "id": "plating", "name": "装甲",     "icon": "🛡", "cost": 10, "hpBonus": 20,
+      "desc": "炮台生命上限 +20" },
+    { "id": "amulet",  "name": "护身符",   "icon": "🧿", "cost": 16, "dmgInMul": 0.9,
+      "desc": "受到的伤害 -10%" },
+    { "id": "blade",   "name": "利刃",     "icon": "🗡", "cost": 16, "dmgOutMul": 1.12,
+      "desc": "对炮台伤害 +12%" },
+    { "id": "vault",   "name": "弹药库",   "icon": "📦", "cost": 10, "ammoCapMul": 1.25,
+      "desc": "弹药上限 +25%" },
+    { "id": "boot",    "name": "推进器",   "icon": "🚀", "cost": 14, "speedMul": 1.15,
+      "desc": "弹珠速度 +15%" },
+    { "id": "second",  "name": "第二生命", "icon": "💗", "cost": 25, "lives": 1,
+      "desc": "开局 +1 额外生命(可叠加)" },
+    { "id": "charm",   "name": "幸运星",   "icon": "🍀", "cost": 14, "extraRelic": 1,
+      "desc": "初始面板弹珠 +1" }
+  ],
+  "wave": {
+    "ramp": 60,
+    "maxWaves": 8,
+    "enemyHpPerWave": 15,
+    "enemyDmgPerWave": 0.10,
+    "enemyRatePerWave": 0.08,
+    "eventInterval": 30,
+    "eventChance": 0.35
+  }
+}

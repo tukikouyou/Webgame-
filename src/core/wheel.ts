@@ -4,8 +4,9 @@ import { toast, explosion } from './fx';
 import { norm } from './util';
 import { fmt } from './util';
 import { fireBomb, fireHoming } from './projectiles';
+import { capFor } from './meta';
 import {
-  TEAMS, AMMO_CAP,
+  TEAMS,
   WX, WY, WX2, WY2, WR, IR, GAP_HALF, SMALL_SEG, BIG_SEG, STAR_RAMP, REG_SEGMENTS,
   PEG_OMEGA, WHEEL_GRAVITY, WHEEL_SPIN, PBR, wheelPegs, SEG_FLASH_DURATION,
   PROJ_SPAWN_OFF, PIERCE_SPEED,
@@ -25,7 +26,7 @@ export function pegPos(s: GameState, p: { r: number; a: number }, cx: number, cy
 }
 
 export function enterUltimate(s: GameState, b: WheelBall): void {
-  s.ultraBalls.push({ x: WX2 + s.rng.range(-30, 30), y: WY2 - IR * 0.6, vx: s.rng.range(-60, 60), vy: 0, c: b.c, inRing: false });
+  s.ultraBalls.push({ x: WX2 + s.rng.range(-30, 30), y: WY2 - IR * 0.6, vx: s.rng.range(-60, 60), vy: 0, c: b.c, inRing: false, plinkoHp: b.plinkoHp || 1, src: b.src });
   toast(s, '🌟 ' + TEAMS[b.c].name + ' 进入终极转盘!', TEAMS[b.c].ball);
 }
 
@@ -85,6 +86,7 @@ export function updateWheel(s: GameState, h: number): void {
 export function triggerSkill(s: GameState, b: WheelBall, ang: number): void {
   const rel = norm(ang - s.theta);
   const reg = regSeg(s);
+  const cap = capFor(s, b.c);
   if (rel >= 9 * reg) {                  // ★ 小扇区:进入终极转盘
     s.segFlashes.push({ s: 9, t: SEG_FLASH_DURATION, col: TEAMS[b.c].ball });
     enterUltimate(s, b);
@@ -96,32 +98,35 @@ export function triggerSkill(s: GameState, b: WheelBall, ang: number): void {
   s.segFlashes.push({ s: seg, t: SEG_FLASH_DURATION, col: tm.ball });
   explosion(s, b.x, b.y, tm.ball, 18, 160);
   if (!c || !c.alive) return;
+  const N = Math.max(1, b.plinkoHp || 1);   // 本体值倍率:技能效果 ×N
   switch (seg) {
-    case 0: {  // +n:数值逐次增长
-      c.ammo = Math.min(AMMO_CAP, c.ammo + s.plusVal);
-      toast(s, '✨ ' + tm.name + ' 弹药 +' + s.plusVal + ' → ' + fmt(c.ammo), tm.ball);
+    case 0: {  // +n × 本体值
+      const add = s.plusVal * N;
+      c.ammo = Math.min(cap, c.ammo + add);
+      toast(s, '✨ ' + tm.name + ' 弹药 +' + add + (N > 1 ? '(本体×' + N + ')' : '') + ' → ' + fmt(c.ammo), tm.ball);
       s.plusVal++;
       s.labels[0] = '+' + s.plusVal;
       break;
     }
-    case 1: {  // 护盾:10 秒
-      c.shield = 10;
-      toast(s, '🛡 ' + tm.name + ' 展开护盾 10 秒!', tm.ball);
+    case 1: {  // 护盾:10 秒 × 本体值
+      c.shield = 10 * N;
+      toast(s, '🛡 ' + tm.name + ' 展开护盾 ' + (10 * N) + ' 秒!', tm.ball);
       break;
     }
-    case 2: {  // ×4
-      c.ammo = Math.min(AMMO_CAP, c.ammo * 4);
-      toast(s, '✨ ' + tm.name + ' 弹药 ×4 → ' + fmt(c.ammo), tm.ball);
+    case 2: {  // ×4 × 本体值(倍率线性放大)
+      const mul = 4 * N;
+      c.ammo = Math.min(cap, c.ammo * mul);
+      toast(s, '✨ ' + tm.name + ' 弹药 ×' + mul + ' → ' + fmt(c.ammo), tm.ball);
       break;
     }
-    case 3: {  // 偷取:夺走待发最多对手一半待发弹药
+    case 3: {  // 偷取:半数 × 本体值(上限=对方全部)
       let victim = null;
       for (const o of s.cannons) {
         if (!o.alive || o.idx === c.idx) continue;
         if (!victim || o.queue > victim.queue) victim = o;
       }
       if (victim && victim.queue > 1) {
-        const n = Math.floor(victim.queue / 2);
+        const n = Math.min(victim.queue, Math.floor(victim.queue / 2) * N);
         victim.queue -= n;
         c.queue += n;
         toast(s, '🕳 ' + tm.name + ' 偷走 ' + TEAMS[victim.idx].name + ' ' + fmt(n) + ' 待发弹药!', tm.ball);
@@ -130,30 +135,31 @@ export function triggerSkill(s: GameState, b: WheelBall, ang: number): void {
       }
       break;
     }
-    case 4:    // 炸弹
-      fireBomb(s, c);
+    case 4:    // 炸弹 × 本体值(发射 N 颗)
+      for (let k = 0; k < N; k++) fireBomb(s, c);
       break;
-    case 5: {  // 贯穿弹:生命 = max(10, 待发弹药 10%)
+    case 5: {  // 贯穿弹:生命 × 本体值
       const n = Math.max(10, Math.floor(c.queue * 0.10));
       c.queue = Math.max(0, c.queue - n);
+      const hp = n * N;
       const a = c.aim;
       s.pierceBalls.push({
         x: c.x + Math.cos(a) * PROJ_SPAWN_OFF, y: c.y + Math.sin(a) * PROJ_SPAWN_OFF,
-        vx: Math.cos(a) * PIERCE_SPEED, vy: Math.sin(a) * PIERCE_SPEED, c: c.idx, hp: n,
+        vx: Math.cos(a) * PIERCE_SPEED, vy: Math.sin(a) * PIERCE_SPEED, c: c.idx, hp,
       });
-      toast(s, '💠 ' + tm.name + ' 发射贯穿弹 (HP ' + fmt(n) + ')!', tm.ball);
+      toast(s, '💠 ' + tm.name + ' 发射贯穿弹 (HP ' + fmt(hp) + ')!', tm.ball);
       break;
     }
-    case 6:    // 回血
+    case 6:    // 回血(满血,无法随本体值叠加)
       c.hp = c.maxHp;
       toast(s, '💚 ' + tm.name + ' 生命回满 (' + c.maxHp + ')!', tm.ball);
       break;
-    case 7:    // 生命上限+10
-      c.maxHp += 10;
-      toast(s, '❤ ' + tm.name + ' 生命上限 +10 → ' + c.maxHp, tm.ball);
+    case 7:    // 生命上限 +10 × 本体值
+      c.maxHp += 10 * N;
+      toast(s, '❤ ' + tm.name + ' 生命上限 +' + (10 * N) + ' → ' + c.maxHp, tm.ball);
       break;
-    case 8:    // 追踪弹
-      fireHoming(s, c);
+    case 8:    // 追踪弹:生命 × 本体值
+      fireHoming(s, c, N);
       break;
   }
 }

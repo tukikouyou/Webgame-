@@ -11,6 +11,23 @@ import {
 
 type Ctx = CanvasRenderingContext2D;
 
+// 触发随机事件时,在战场中央画大号低透明度"水印",随时间淡出。画在格子之上、实体之下。
+export function drawEventBanner(ctx: Ctx, s: GameState): void {
+  const b = s.eventBanner;
+  if (!b || b.t <= 0) return;
+  const a = 0.14 * Math.min(1, b.t / (b.max * 0.6));   // 前 40% 保持,后段淡出
+  ctx.save();
+  ctx.globalAlpha = a;
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = 'bold 110px "Microsoft YaHei", Verdana, sans-serif';
+  ctx.fillText(b.icon + ' ' + b.name, BX + BS / 2, BY + BS / 2);
+  ctx.restore();
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+}
+
 export function drawMarbles(ctx: Ctx, s: GameState): void {
   for (let c = 0; c < 4; c++) {
     ctx.fillStyle = TEAMS[c].ball;

@@ -32,6 +32,44 @@ export interface SkillsConfig {
   cannonDefaults: CannonDefaults;
 }
 
+/* meta.json:局外成长(金币/经验/遗物)与波次难度 */
+export interface RelicDef {
+  id: string;
+  name: string;
+  icon: string;
+  cost: number;
+  dmgMul?: number;
+  speedMul?: number;
+  fireRateMul?: number;
+  hpBonus?: number;
+  lives?: number;
+  ammoCapMul?: number;
+  dmgOutMul?: number;
+  dmgInMul?: number;
+  extraRelic?: number;
+  desc: string;
+}
+
+export interface MetaConfig {
+  xpGrow: number;
+  coinsPerWin: number;
+  coinsPerWave: number;
+  xpPerWin: number;
+  lvDmg: number;
+  lvFire: number;
+  maxLevel: number;
+  relics: RelicDef[];
+  wave: {
+    ramp: number;
+    maxWaves: number;
+    enemyHpPerWave: number;
+    enemyDmgPerWave: number;
+    enemyRatePerWave: number;
+    eventInterval: number;
+    eventChance: number;
+  };
+}
+
 /* tuning.json 的分组结构 */
 export interface TuningConfig {
   canvas: { W: number; H: number };

@@ -55,6 +55,42 @@
   .dbgGlobal{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
   .dbgGlobal button{font-size:12px;padding:5px 10px;}
   .closeX{position:absolute;top:12px;right:16px;cursor:pointer;font-size:22px;color:#888;line-height:1;}
+  /* ---- 局外成长面板 ---- */
+  .setupMeta{margin-top:16px;border:1px solid #2a2a30;border-radius:10px;padding:12px 14px;background:#0c0c10;}
+  .metaRow{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  .metaLvl{font-weight:bold;font-size:16px;color:#ffd24a;}
+  .xpBar{flex:1;min-width:160px;height:10px;background:#1c1c22;border-radius:5px;overflow:hidden;}
+  .xpFill{height:100%;background:linear-gradient(90deg,#3ad07f,#7ae0a0);border-radius:5px;}
+  .xpTxt{font-size:12px;color:#aaa;font-variant-numeric:tabular-nums;}
+  .metaCoins{font-size:14px;color:#ffd24a;font-weight:bold;}
+  .metaWins{font-size:13px;color:#bbb;}
+  .relicRow{margin-top:10px;display:flex;flex-wrap:wrap;gap:6px;}
+  .relicChip{font-size:12px;padding:4px 9px;border-radius:12px;background:#1a1a20;border:1px solid #2f2f38;color:#ddd;}
+  .relicNone{font-size:12px;color:#777;}
+  .youTag{background:#ffd24a;color:#111;font-size:11px;font-weight:bold;padding:2px 7px;border-radius:4px;margin-right:4px;}
+  .teamCard.isPlayer{box-shadow:0 0 0 2px #ffd24a55;}
+  .pickYou{font-size:11px;padding:4px 8px;}
+  .pickYou.sel{background:#ffd24a;color:#111;font-weight:bold;}
+  /* ---- 商店 ---- */
+  .relicGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+  .relicCard{display:flex;flex-direction:column;gap:5px;align-items:flex-start;padding:12px;
+             border:1px solid #2a2a30;border-radius:10px;background:#14141a;color:#ddd;cursor:pointer;font-family:inherit;text-align:left;}
+  .relicCard:hover{border-color:#ffd24a;}
+  .relicCard.poor{opacity:0.45;cursor:not-allowed;}
+  .rIcon{font-size:24px;}
+  .rName{font-weight:bold;font-size:14px;}
+  .rName i{color:#888;font-style:normal;font-size:11px;}
+  .rDesc{font-size:12px;color:#aaa;line-height:1.4;}
+  .rCost{font-size:13px;color:#ffd24a;font-weight:bold;margin-top:4px;}
+  /* ---- 三选一 ---- */
+  .choiceGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px;}
+  .choiceCard{display:flex;flex-direction:column;gap:6px;align-items:center;padding:20px 14px;
+              border:1px solid #2a2a30;border-radius:12px;background:#14141a;color:#ddd;cursor:pointer;font-family:inherit;}
+  .choiceCard:hover{border-color:#3ad07f;transform:translateY(-2px);background:#181820;}
+  .cIcon{font-size:34px;}
+  .cName{font-weight:bold;font-size:15px;}
+  .cDesc{font-size:12px;color:#aaa;text-align:center;line-height:1.5;}
+  @media (max-width:720px){ .relicGrid,.choiceGrid{grid-template-columns:1fr;} }
 </style>
 </head>
 <body>
@@ -64,6 +100,7 @@
     <button id="btnPause">⏸ 暂停</button>
     <button id="btnReset">↻ 重新开始</button>
     <button id="btnSetup">⚙ 选择炮台</button>
+    <button id="btnShop">🛒 商店</button>
     <button id="btnDebug">🛠 调试面板</button>
     <button class="sp active" data-s="1">1×</button>
     <button class="sp" data-s="2">2×</button>
@@ -76,6 +113,7 @@
     <h2>选择炮台专属特性</h2>
     <p style="color:#999;font-size:13px;margin-bottom:6px;">为四个炮台各选一项专属特性,然后开始对战。</p>
     <div class="teamGrid" id="setupGrid"></div>
+    <div id="setupMeta" class="setupMeta"></div>
     <button class="startBtn" id="btnStart">开始对战 ▶</button>
   </div>
 </div>
@@ -92,12 +130,31 @@
     <div id="dbgBody"></div>
   </div>
 </div>
+<!-- 局外商店(波次结算后可从选择界面打开;当前内嵌于三选一流程的金币说明) -->
+<div id="shop" class="overlay hidden">
+  <div class="modal">
+    <span class="closeX" id="shopClose">×</span>
+    <h2>🛒 局外商店 <span id="shopCoins" style="float:right;font-size:16px;">🪙 0</span></h2>
+    <p style="color:#999;font-size:13px;margin-bottom:10px;">购买遗物,效果每局自动生效,可重复购买叠加。金币来自波次推进与整局胜利。</p>
+    <div class="relicGrid" id="shopBody"></div>
+  </div>
+</div>
+<!-- 波次三选一 -->
+<div id="choice" class="overlay hidden">
+  <div class="modal" style="width:min(760px,94vw);">
+    <h2 id="choiceTitle">波次结算</h2>
+    <div class="choiceGrid" id="choiceBody"></div>
+  </div>
+</div>
 <div id="wrap"><canvas id="cv" width="1600" height="900"></canvas></div>
 <footer>
   <b>规则:</b>左上弹珠面板不断掉落四色小球;RELEASE 与 MULTIPLY 开局等宽,随时间 RELEASE 渐窄、MULTIPLY 渐宽,
   3 分钟后稳定为 1:4,SPIN 宽度不变 —— 落入 <b>MULTIPLY</b>:该色弹药 ×2(初始为 1);
   落入 <b>RELEASE</b>:炮台把累计弹药全部发射出去;落入 <b>SPIN</b>:小球进入右上技能转盘,在圆形节点间弹跳,
-  只能从内圈挡板底部的小口掉进不断旋转的技能圆环——落在哪个扇区就触发哪个技能。
+  只能从内圈挡板底部的小口掉进不断旋转的技能圆环——落在哪个扇区就触发哪个技能。<br>
+  <b>RPG 局外成长:</b>开局选一个炮台作为你的队伍(其余 3 队为 AI)。每当一队被淘汰,进入下一波次——AI 强化、你获得金币,
+  并三选一强化(装甲/钢珠/弹药/护盾/宣示主权……,波次越高选项越强);随机事件(弹雨/地动/祝福/磁暴/寒霜)让每局不同。
+  整局胜利获得大量金币与经验,在<b>局外商店</b>购买遗物(钢珠/涡轮/装甲/第二生命……),效果跨局永久生效、可叠加。
 </footer>
 <script type="module" src="/src/main.ts"></script>
 </body>

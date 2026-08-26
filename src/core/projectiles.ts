@@ -145,13 +145,14 @@ function bombAt(s: GameState, color: number, tx: number, ty: number): void {
 }
 
 /* ---------- 追踪弹 ---------- */
-export function fireHoming(s: GameState, c: Cannon): void {
+export function fireHoming(s: GameState, c: Cannon, mult: number = 1): void {
   const tm = TEAMS[c.idx];
   const n = Math.max(10, Math.floor(c.queue * 0.10));
   c.queue = Math.max(0, c.queue - n);
+  const hp = n * mult;   // 本体值倍率放大威力
   const a = c.aim;
-  s.homingBalls.push({ x: c.x + Math.cos(a) * PROJ_SPAWN_OFF, y: c.y + Math.sin(a) * PROJ_SPAWN_OFF, dir: a, c: c.idx, hp: n });
-  toast(s, '🎯 ' + tm.name + ' 发射追踪弹 (HP ' + fmt(n) + ')!', tm.ball);
+  s.homingBalls.push({ x: c.x + Math.cos(a) * PROJ_SPAWN_OFF, y: c.y + Math.sin(a) * PROJ_SPAWN_OFF, dir: a, c: c.idx, hp });
+  toast(s, '🎯 ' + tm.name + ' 发射追踪弹 (HP ' + fmt(hp) + ')!', tm.ball);
 }
 export function updateHoming(s: GameState, h: number): void {
   const out = [];

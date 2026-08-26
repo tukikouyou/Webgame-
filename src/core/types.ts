@@ -45,8 +45,8 @@ export interface Cannon {
 
 /* ---- 各类弹体 ---- */
 export interface Marble { x: number; y: number; vx: number; vy: number; c: number; hp: number; }
-export interface PlinkoBall { x: number; y: number; vx: number; vy: number; c: number; }
-export interface WheelBall { x: number; y: number; vx: number; vy: number; c: number; inRing: boolean; }
+export interface PlinkoBall { x: number; y: number; vx: number; vy: number; c: number; hp: number; }   // hp = 本体值(初始1,可被终极技能提升)
+export interface WheelBall { x: number; y: number; vx: number; vy: number; c: number; inRing: boolean; plinkoHp: number; src: PlinkoBall | null; }   // plinkoHp = 携带的本体值快照;src = 来源面板球(用于"本体+1"回写,null=球已消失)
 export interface PierceBall { x: number; y: number; vx: number; vy: number; c: number; hp: number; }
 export interface BombBall { x: number; y: number; vx: number; vy: number; c: number; dead: boolean; }
 export interface NukeBall { x: number; y: number; vx: number; vy: number; c: number; dead: boolean; }
@@ -110,6 +110,20 @@ export interface GameState {
   winner: Cannon | null;
   winTimer: number;
   confettiT: number;
+
+  // 波次 / 事件(roguelike)
+  wave: number;
+  waveMaxed: boolean;
+  waveTime: number;
+  eventAcc: number;
+  eventBanner: { name: string; icon: string; t: number; max: number } | null;   // 触发事件时的背景水印(渲染读)
+  bentiBuff: number[];   // 各队"本体充能"剩余秒数(>0 时该队面板球本体值临时 +1)
+
+  // 局外成长(Meta)
+  metaLevel: number;
+  playerIdx: number;   // 玩家控制的炮台(其余 3 队为 AI)
+  elimResult: 'kill' | 'aiKill' | null;   // 最近一次 AI 淘汰的归因(由 main 消费)
+  use: import('./meta').UseMeta | null;   // 开局派生,运行期只读
 
   // 运行期可变数据
   labels: string[];   // 普通转盘技能标签(+n 会变)

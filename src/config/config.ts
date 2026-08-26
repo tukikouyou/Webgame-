@@ -4,7 +4,8 @@ import tuningJson from './tuning.json';
 import teamsJson from './teams.json';
 import traitsJson from './traits.json';
 import skillsJson from './skills.json';
-import type { TeamDef, TraitDef, TraitKey, SkillsConfig, TuningConfig } from './configTypes';
+import metaJson from './meta.json';
+import type { TeamDef, TraitDef, TraitKey, SkillsConfig, TuningConfig, MetaConfig, RelicDef } from './configTypes';
 
 const T = tuningJson as unknown as TuningConfig;
 
@@ -114,6 +115,11 @@ export const WAVE_SPEED = T.fx.waveSpeed;
 export const LOOP_MAX_DT = T.loop.maxDt;
 export const LOOP_SUBSTEP = T.loop.subStep;
 export const LOOP_MAX_SUBSTEPS = T.loop.maxSubSteps;
+
+/* ---- 局外成长 / 波次 ---- */
+export const META = metaJson as unknown as Omit<MetaConfig, 'relics' | 'wave'>;
+export const META_WAVE = metaJson.wave;
+export const RELICS: RelicDef[] = metaJson.relics;
 
 /* ---- 数据表 ---- */
 export const NEUTRAL = '#9c9c9c';

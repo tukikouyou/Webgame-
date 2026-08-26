@@ -13,6 +13,7 @@ export function initControls(app: App, openSetup: () => void, openDebug: () => v
   btnPause.onclick = () => setPaused(app, !app.paused);
   document.getElementById('btnReset')!.onclick = () => { app.newGame(); };
   document.getElementById('btnSetup')!.onclick = openSetup;
+  document.getElementById('btnShop')!.onclick = () => app.interlude.openShop();
   document.getElementById('btnDebug')!.onclick = openDebug;
 
   document.querySelectorAll('.sp').forEach(b => {
@@ -24,4 +25,10 @@ export function initControls(app: App, openSetup: () => void, openDebug: () => v
 
   const cv = document.getElementById('cv')!;
   cv.addEventListener('click', () => { if (app.state.gameOver) openSetup(); });
+
+  /* 商店关闭 */
+  const shopClose = document.getElementById('shopClose');
+  if (shopClose) shopClose.onclick = () => app.interlude.closeShop();
+  const shopEl = document.getElementById('shop');
+  if (shopEl) shopEl.addEventListener('click', e => { if (e.target === shopEl) app.interlude.closeShop(); });
 }

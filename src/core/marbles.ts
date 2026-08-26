@@ -6,6 +6,7 @@ import { applyMagnet, shielded, hitShield, guardHit, applyDamage } from './damag
 import {
   TEAMS, N, BX, BY, BS, CS, MR, SHIELD_R, CANNON_HIT_R, CANNON_DMG_CD, MARBLE_MIN_SPEED2,
 } from '../config/config';
+import { waveEnemyDmgMul } from './meta';
 
 export function phaseWallKick(s: GameState, m: Marble): void {
   if (s.rng.next() < 0.25) {
@@ -99,7 +100,7 @@ export function updateMarbles(s: GameState, h: number): void {
           if (c.dmgCd <= 0) {
             c.dmgCd = CANNON_DMG_CD;
             spark(s, m.x, m.y, TEAMS[m.c].ball);
-            applyDamage(s, c, Math.max(1, m.hp), m.c);
+            applyDamage(s, c, waveEnemyDmgMul(s) * Math.max(1, m.hp), m.c);
           }
           break;
         }

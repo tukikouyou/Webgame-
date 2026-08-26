@@ -9,6 +9,7 @@ import {
   GUARD_SPIN, NOMAD_SPEED, NOMAD_SPIN,
   CELLREG_INTERVAL, PLINKO_AMMO_INTERVAL, REGEN_INTERVAL,
 } from '../config/config';
+import { metaFireHp, metaFireSpeed, useFor } from './meta';
 
 // ---- 专属特性初始化 ----
 export function initTrait(c: Cannon): void {
@@ -22,9 +23,9 @@ export function initTrait(c: Cannon): void {
 export function fireMarble(s: GameState, c: Cannon): void {
   const id = c.idx;
   const a = c.aim + s.rng.range(-AIM_SPREAD, AIM_SPREAD);
-  const sp = s.rng.range(s.cfg.spMin[id], s.cfg.spMax[id]);
-  let hp = s.cfg.marbleDmg[id];
-  if (c.trait === 'dblhp') hp *= 2;
+  const u = useFor(s, id);   // 局外加成只对玩家
+  const sp = metaFireSpeed(s.rng.range(s.cfg.spMin[id], s.cfg.spMax[id]), u);
+  const hp = metaFireHp(s.cfg.marbleDmg[id], u, c);
   s.marbles.push({
     x: c.x + Math.cos(a) * MARBLE_SPAWN_OFF, y: c.y + Math.sin(a) * MARBLE_SPAWN_OFF,
     vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, c: id, hp,
@@ -60,7 +61,8 @@ export function updateCannons(s: GameState, h: number): void {
     if (c.shield > 0) c.shield = Math.max(0, c.shield - h);
     if (c.trait === 'nomad') c.aim += h * NOMAD_SPIN;
     else c.aim = c.base + Math.sin(s.t * SWING_FREQ + c.phase) * s.cfg.swing[id];
-    const rate = Math.min(s.cfg.fireRateMax[id], FIRE_RATE_BASE + c.queue * FIRE_RATE_QUEUE_FACTOR);
+    const uc = useFor(s, id);   // 射速加成只对玩家
+    const rate = Math.min(s.cfg.fireRateMax[id] * (uc ? uc.fireRateMul : 1), FIRE_RATE_BASE + c.queue * FIRE_RATE_QUEUE_FACTOR);
     c.fireAcc += h * rate;
     while (c.fireAcc >= 1 && c.queue > 0) {
       c.fireAcc -= 1;

@@ -6,9 +6,11 @@ import { createRng } from './rng';
 import { initTrait } from './cannons';
 import { newPlinkoBall } from './plinko';
 import {
-  TEAMS, SKILLS, N, BX, BY, BS, CS, MAX_HP,
+  TEAMS, SKILLS, N, BX, BY, BS, CS, MAX_HP, AMMO_CAP,
   INIT_TERRITORY_R_RATIO, CANNON_OFFSET_RATIO, PLINKO_INIT_BALLS,
 } from '../config/config';
+import { useMeta, metaStartingHp, metaStartingLives } from './meta';
+import type { MetaState } from './meta';
 
 export function createCfg(): Cfg {
   const d = SKILLS.cannonDefaults;
@@ -36,6 +38,9 @@ export function createState(seed: number): GameState {
     waves: [], particles: [], toasts: [], flashes: [], segFlashes: [], segFlashes2: [],
     t: 0, theta: 0, theta2: 0, pegTheta: 0, plusVal: 1,
     gameOver: false, winner: null, winTimer: 0, confettiT: 0,
+    wave: 1, waveMaxed: false, waveTime: 0, eventAcc: 0, eventBanner: null,
+    bentiBuff: [0, 0, 0, 0],
+    metaLevel: 1, playerIdx: 0, elimResult: null, use: null,
     labels: [...SKILLS.normal],
     cfg: createCfg(),
     rng: createRng(seed),
@@ -46,11 +51,16 @@ export function createState(seed: number): GameState {
 }
 
 // 重置一局(保留 s.cfg —— 玩家选的特性/调试数值)。seed 非空则重新置种。
-export function resetState(s: GameState, seed?: number): void {
+// meta: 局外存档(金币/等级/遗物),非空时套用局外加成;wave: 波次(roguelike 难度)。
+export function resetState(s: GameState, meta: MetaState | null = null, seed?: number): void {
   if (seed != null) s.rng.seed = seed;
   s.t = 0; s.theta = 0; s.theta2 = 0; s.pegTheta = 0;
   s.plusVal = 1; s.labels = [...SKILLS.normal];
   s.gameOver = false; s.winner = null; s.winTimer = 0; s.confettiT = 0;
+  s.wave = 1; s.waveMaxed = false; s.waveTime = 0; s.eventAcc = 0;
+  s.eventBanner = null;
+  s.bentiBuff = [0, 0, 0, 0];
+  s.elimResult = null;
   s.marbles = []; s.plinkoBalls = []; s.wheelBalls = []; s.pierceBalls = [];
   s.bombBalls = []; s.nukeBalls = []; s.homingBalls = []; s.ultraBalls = [];
   s.shockwaves = []; s.waves = []; s.particles = []; s.toasts = [];
@@ -76,13 +86,17 @@ export function resetState(s: GameState, seed?: number): void {
   s.dirtyCells.clear();
   s.gridDirtyAll = true;
 
+  const u = meta ? useMeta(meta, AMMO_CAP) : null;   // 局外加成:仅玩家享受
   s.cannons = TEAMS.map((tm, idx): Cannon => {
     const off = Math.round(N * CANNON_OFFSET_RATIO);
     const ci = tm.corner[0] ? N - 1 - off : off;
     const cj = tm.corner[1] ? N - 1 - off : off;
     const x = BX + (ci + 0.5) * CS, y = BY + (cj + 0.5) * CS;
+    const isPlayer = idx === s.playerIdx;
+    const hp = (u && isPlayer) ? metaStartingHp(u, MAX_HP) : MAX_HP;
     const c: Cannon = {
-      idx, x, y, hp: MAX_HP, maxHp: MAX_HP, shield: 0, shieldHp: 0, lives: 0, purge: false,
+      idx, x, y, hp, maxHp: hp, shield: 0, shieldHp: 0,
+      lives: (u && isPlayer) ? metaStartingLives(u) : 0, purge: false,
       ammo: 1, queue: 10, fireAcc: 0, dmgCd: 0, alive: true,
       trait: s.cfg.trait[idx],
       dmgTaken: 0, regenAcc: 0, cellRegAcc: 0, plinkoAcc: 0,
@@ -93,10 +107,13 @@ export function resetState(s: GameState, seed?: number): void {
     initTrait(c);
     return c;
   });
+  s.use = u;
+  s.metaLevel = meta ? meta.level : 1;
 
-  // 弹珠面板:每色初始小球(受增殖特性影响 +1)
+  // 弹珠面板:每色初始小球(受增殖特性影响;额外弹珠遗物只给玩家)
   for (let i = 0; i < 4; i++) {
-    const base = PLINKO_INIT_BALLS + (s.cannons[i].trait === 'plinko' ? 1 : 0);
+    const extra = (u && i === s.playerIdx) ? u.extraPlinko : 0;
+    const base = PLINKO_INIT_BALLS + (s.cannons[i].trait === 'plinko' ? 1 : 0) + extra;
     for (let n = 0; n < base; n++) s.plinkoBalls.push(newPlinkoBall(s, i));
   }
 }

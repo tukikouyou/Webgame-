@@ -3,7 +3,7 @@ import type { GameState } from '../core/types';
 import { flushGrid, getGridCanvas } from './grid';
 import {
   drawMarbles, drawPierce, drawBombs, drawNukes, drawHoming,
-  drawCannon, drawWaves, drawShockwaves, drawHUD,
+  drawCannon, drawWaves, drawShockwaves, drawHUD, drawEventBanner,
 } from './drawArena';
 import { drawPlinko, drawWheel, drawUltimate } from './drawPanels';
 import { drawParticles, drawToasts, drawOver } from './drawFx';
@@ -20,6 +20,7 @@ export function render(ctx: CanvasRenderingContext2D, s: GameState): void {
   ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
   ctx.strokeRect(BX, BY, BS, BS);
 
+  drawEventBanner(ctx, s);   // 背景水印(格子之上、实体之下)
   drawMarbles(ctx, s);
   drawPierce(ctx, s);
   drawBombs(ctx, s);

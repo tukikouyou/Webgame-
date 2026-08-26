@@ -3,12 +3,30 @@ import type { GameState } from '../core/types';
 import { slotBounds } from '../core/plinko';
 import { regSeg, pegPos } from '../core/wheel';
 import {
-  TEAMS, ULT_LABELS,
+  TEAMS, ULT_LABELS, ULT_SEGMENTS,
   PX, PY, PW, PH, SLOT_H, PBR, pegs,
   WX, WY, WX2, WY2, WR, IR, GAP_HALF, SEG, wheelPegs,
 } from '../config/config';
 
 type Ctx = CanvasRenderingContext2D;
+
+// 画一颗面板/转盘小球,并在本体值 >=2 时标出数字(默认值 1 不标,避免刷屏)。
+// 本体值越大球越大,一眼能看出"厚"球。
+function drawBall(ctx: Ctx, x: number, y: number, colorIdx: number, val: number): void {
+  const r = val >= 2 ? PBR + 3 + Math.min(5, val - 2) : PBR;
+  ctx.fillStyle = TEAMS[colorIdx].ball;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, 6.283); ctx.fill();
+  if (val >= 2) {
+    const txt = '' + val;
+    const fs = Math.max(8, Math.min(14, r * 1.2) - (txt.length - 1) * 2);
+    ctx.font = 'bold ' + fs.toFixed(0) + 'px Verdana';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+    ctx.strokeText(txt, x, y + 0.5);
+    ctx.fillStyle = '#fff'; ctx.fillText(txt, x, y + 0.5);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  }
+}
 
 export function drawPlinko(ctx: Ctx, s: GameState): void {
   ctx.fillStyle = '#0d0d10';
@@ -33,10 +51,7 @@ export function drawPlinko(ctx: Ctx, s: GameState): void {
     ctx.font = 'bold ' + fs.toFixed(0) + 'px Verdana';
     ctx.fillText(z[2], x0 + (w - 3) / 2, sy + SLOT_H / 2 + fs * 0.36);
   }
-  for (const b of s.plinkoBalls) {
-    ctx.fillStyle = TEAMS[b.c].ball;
-    ctx.beginPath(); ctx.arc(b.x, b.y, PBR, 0, 6.283); ctx.fill();
-  }
+  for (const b of s.plinkoBalls) drawBall(ctx, b.x, b.y, b.c, b.hp + (s.bentiBuff[b.c] > 0 ? 1 : 0));
   // 面板各色弹珠数
   const cnt = [0, 0, 0, 0];
   for (const b of s.plinkoBalls) cnt[b.c]++;
@@ -107,10 +122,7 @@ export function drawWheel(ctx: Ctx, s: GameState): void {
     ctx.moveTo(px + 5, py); ctx.arc(px, py, 5, 0, 6.283);
   }
   ctx.fill();
-  for (const b of s.wheelBalls) {
-    ctx.fillStyle = TEAMS[b.c].ball;
-    ctx.beginPath(); ctx.arc(b.x, b.y, PBR, 0, 6.283); ctx.fill();
-  }
+  for (const b of s.wheelBalls) drawBall(ctx, b.x, b.y, b.c, b.plinkoHp);
   ctx.textAlign = 'left';
 }
 
@@ -118,7 +130,7 @@ export function drawUltimate(ctx: Ctx, s: GameState): void {
   ctx.fillStyle = '#0d0d10';
   ctx.beginPath(); ctx.arc(WX2, WY2, WR + 30, 0, 6.283); ctx.fill();
   ctx.strokeStyle = '#6b5a1f'; ctx.lineWidth = 2; ctx.stroke();
-  for (let seg = 0; seg < 7; seg++) {
+  for (let seg = 0; seg < ULT_SEGMENTS; seg++) {
     const a0 = s.theta2 + seg * SEG, a1 = a0 + SEG;
     const fl = s.segFlashes2.find(f => f.s === seg);
     if (fl) {
@@ -164,9 +176,6 @@ export function drawUltimate(ctx: Ctx, s: GameState): void {
     ctx.moveTo(px + 5, py); ctx.arc(px, py, 5, 0, 6.283);
   }
   ctx.fill();
-  for (const b of s.ultraBalls) {
-    ctx.fillStyle = TEAMS[b.c].ball;
-    ctx.beginPath(); ctx.arc(b.x, b.y, PBR, 0, 6.283); ctx.fill();
-  }
+  for (const b of s.ultraBalls) drawBall(ctx, b.x, b.y, b.c, b.plinkoHp);
   ctx.textAlign = 'left';
 }
