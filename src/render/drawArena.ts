@@ -5,7 +5,7 @@ import { shielded } from '../core/damage';
 import { pierceRadius, homingRadius } from '../core/projectiles';
 import { shade } from './colors';
 import {
-  TEAMS, TRAITS, MR, SHIELD_R, BX, BY, BS, NUKE_R,
+  TEAMS, TRAITS, MR, SHIELD_R, BX, BY, BS, NUKE_R, NUKE_FADE,
   GUARD_RAD, GUARD_THICK, GUARD_SPAN, MAGNET_R,
 } from '../config/config';
 
@@ -110,7 +110,8 @@ export function drawShockwaves(ctx: Ctx, s: GameState): void {
   ctx.save();
   ctx.beginPath(); ctx.rect(BX, BY, BS, BS); ctx.clip();
   for (const w of s.shockwaves) {
-    const a = Math.max(0.15, 1 - w.r / NUKE_R);
+    const fadeRatio = w.r >= NUKE_R ? Math.max(0, w.fade / NUKE_FADE) : 1;   // 到顶后按剩余淡出时间渐隐
+    const a = Math.max(0.15, 1 - w.r / NUKE_R) * fadeRatio;
     ctx.globalAlpha = 0.10 * a;
     ctx.fillStyle = TEAMS[w.c].ball;
     ctx.beginPath(); ctx.arc(w.x, w.y, w.r, 0, 6.283); ctx.fill();

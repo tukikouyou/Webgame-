@@ -51,7 +51,7 @@ export interface PierceBall { x: number; y: number; vx: number; vy: number; c: n
 export interface BombBall { x: number; y: number; vx: number; vy: number; c: number; dead: boolean; }
 export interface NukeBall { x: number; y: number; vx: number; vy: number; c: number; dead: boolean; }
 export interface HomingBall { x: number; y: number; dir: number; c: number; hp: number; }
-export interface Shockwave { x: number; y: number; r: number; c: number; }
+export interface Shockwave { x: number; y: number; r: number; c: number; fade: number; claimR: number; }   // fade=达到最大半径后的淡出剩余秒数;claimR=已染色到的半径
 
 /* ---- 特效缓冲(逻辑写入,渲染只读) ---- */
 export interface Wave { x: number; y: number; r: number; max: number; col: string; }

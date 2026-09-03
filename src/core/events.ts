@@ -5,6 +5,7 @@ import { toast } from './fx';
 import { setCell } from './grid';
 import { newPlinkoBall } from './plinko';
 import { TEAMS, N, BX, BY, BS } from '../config/config';
+import { META_WAVE } from '../config/meta';
 import { waveClamped, capFor } from './meta';
 
 export interface Choice {
@@ -93,7 +94,7 @@ export const ARENA_EVENTS: ArenaEvent[] = [
 
 export function randomEvent(s: GameState): ArenaEvent | null {
   const r = s.rng.next();
-  if (r > 0.10) return null;             // 每次判定 10% 概率
+  if (r > META_WAVE.eventChance) return null;   // 触发概率读配置 config/meta.json (eventChance)
   return ARENA_EVENTS[(s.rng.next() * ARENA_EVENTS.length) | 0];
 }
 
@@ -113,9 +114,10 @@ export function fireEvent(s: GameState, ev: ArenaEvent): void {
       break;
     }
     case 'quake': {
+      // 加强:全场均匀判定(不再只削顶部),每格 6% 概率化为中立
       let n = 0;
-      for (let k = 0; k < s.cells.length && n < 60; k++) {
-        if (s.cells[k] >= 0 && s.rng.next() < 0.12) { s.cells[k] = -1; s.cellHp[k] = 1; s.dirtyCells.add(k); n++; }
+      for (let k = 0; k < s.cells.length; k++) {
+        if (s.cells[k] >= 0 && s.rng.next() < 0.06) { s.cells[k] = -1; s.cellHp[k] = 1; s.dirtyCells.add(k); n++; }
       }
       toast(s, '🌋 地动!战场 ' + n + ' 格化为中立', '#ffb84d');
       break;
@@ -140,12 +142,12 @@ export function fireEvent(s: GameState, ev: ArenaEvent): void {
   }
 }
 
-/* 事件冷却驱动:每帧调用,每 30 秒判定一次 */
+/* 事件冷却驱动:每帧调用,间隔与概率读 config/meta.json (eventInterval / eventChance) */
 export function updateEvents(s: GameState, h: number): void {
   if (s.eventBanner) { s.eventBanner.t -= h; if (s.eventBanner.t <= 0) s.eventBanner = null; }
   for (let i = 0; i < s.bentiBuff.length; i++) if (s.bentiBuff[i] > 0) s.bentiBuff[i] = Math.max(0, s.bentiBuff[i] - h);
   s.eventAcc += h;
-  const interval = 30;
+  const interval = META_WAVE.eventInterval;
   if (s.eventAcc >= interval) {
     s.eventAcc = 0;
     const ev = randomEvent(s);

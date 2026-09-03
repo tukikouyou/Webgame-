@@ -42,6 +42,7 @@ export const BOMB_RC = T.projectiles.BOMB_RC;
 export const NBR = T.projectiles.NBR;
 export const NUKE_R = T.projectiles.NUKE_R;
 export const NUKE_SPEED = T.projectiles.NUKE_SPEED;
+export const NUKE_FADE = T.projectiles.NUKE_FADE;
 export const BOMB_SPEED = T.projectiles.bombSpeed;
 export const NUKE_BALL_SPEED = T.projectiles.nukeSpeed;
 export const PIERCE_SPEED = T.projectiles.pierceSpeed;

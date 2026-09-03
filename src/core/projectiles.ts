@@ -1,13 +1,13 @@
 /* §SKILLS 各技能弹体:炸弹 / 追踪弹 / 核弹+冲击波 / 贯穿弹。
    每种都有 fireXxx(发射) + updateXxx(每帧推进与碰撞)。 */
-import type { GameState, Cannon, HomingBall, PierceBall } from './types';
+import type { GameState, Cannon, HomingBall, PierceBall, Shockwave } from './types';
 import { spark, explosion, toast } from './fx';
 import { setCell, markCell, paintCell } from './grid';
 import { applyMagnet, shielded, hitShield, clashPermanentShield, guardHit, applyDamage } from './damage';
 import { fmt } from './util';
 import {
   TEAMS, N, BX, BY, BS, CS, MR, SHIELD_R, CANNON_HIT_R,
-  PR, BBR, BOMB_RC, NBR, NUKE_R, NUKE_SPEED, BOMB_SPEED, NUKE_BALL_SPEED,
+  PR, BBR, BOMB_RC, NBR, NUKE_R, NUKE_SPEED, NUKE_FADE, BOMB_SPEED, NUKE_BALL_SPEED,
   SKILL_R_HP_REF, SKILL_R_GROW, SKILL_R_MAX, HOMING_SPEED, HOMING_TURN, HBR,
   GUARD_RAD, GUARD_THICK, PROJ_SPAWN_OFF,
 } from '../config/config';
@@ -278,7 +278,7 @@ export function updateNukes(s: GameState, h: number): void {
       const ci = ((xx - BX) / CS) | 0, cj = ((yy - BY) / CS) | 0;
       if (ci < 0 || cj < 0 || ci >= N || cj >= N) continue;
       if (s.cells[cj * N + ci] !== b.c) {
-        s.shockwaves.push({ x: xx, y: yy, r: 0, c: b.c });
+        s.shockwaves.push({ x: xx, y: yy, r: 0, c: b.c, fade: NUKE_FADE, claimR: 0 });
         explosion(s, xx, yy, '#ffffff', 80, 420);
         toast(s, '☢ ' + TEAMS[b.c].name + ' 核弹引爆!', TEAMS[b.c].ball);
         boom = true;
@@ -290,12 +290,34 @@ export function updateNukes(s: GameState, h: number): void {
   }
   s.nukeBalls = out;
 }
+// 冲击波把覆盖到的格子染成 owner 色(随扩散渐进染色,每前进约一格才扫一次,省性能)
+function claimShockCells(s: GameState, w: Shockwave): void {
+  const r2 = w.r * w.r, pr2 = w.claimR * w.claimR, rc = w.r / CS;
+  const cxCell = (w.x - BX) / CS, cyCell = (w.y - BY) / CS;
+  const i0 = Math.max(0, Math.floor(cxCell - rc)), i1 = Math.min(N - 1, Math.ceil(cxCell + rc));
+  const j0 = Math.max(0, Math.floor(cyCell - rc)), j1 = Math.min(N - 1, Math.ceil(cyCell + rc));
+  for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+    const dx = BX + (i + 0.5) * CS - w.x, dy = BY + (j + 0.5) * CS - w.y;
+    const d2 = dx * dx + dy * dy;
+    if (d2 <= r2 && d2 > pr2) paintCell(s, i, j, w.c);
+  }
+  w.claimR = w.r;
+}
+
 export function updateShockwaves(s: GameState, h: number): void {
   const out = [];
   for (const w of s.shockwaves) {
-    w.r += NUKE_SPEED * h;
-    engulf(s, w.x, w.y, w.r * w.r, w.c);
-    if (w.r < NUKE_R) out.push(w);
+    if (w.r < NUKE_R) {
+      w.r = Math.min(NUKE_R, w.r + NUKE_SPEED * h);
+      engulf(s, w.x, w.y, w.r * w.r, w.c);
+      if (w.r - w.claimR >= CS || w.r >= NUKE_R) claimShockCells(s, w);   // 沿途染色:核弹变更地块所属
+      out.push(w);
+    } else {
+      // 已到最大半径:继续吞噬,并在 NUKE_FADE 秒内逐渐淡出(不再突兀消失)
+      engulf(s, w.x, w.y, w.r * w.r, w.c);
+      w.fade -= h;
+      if (w.fade > 0) out.push(w);
+    }
   }
   s.shockwaves = out;
 }

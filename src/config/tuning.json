@@ -30,6 +30,7 @@
     "NBR": 11,
     "NUKE_R": 400,
     "NUKE_SPEED": 20,
+    "NUKE_FADE": 1.2,
     "bombSpeed": 160,
     "nukeSpeed": 160,
     "pierceSpeed": 140,
