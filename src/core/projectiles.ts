@@ -7,7 +7,7 @@ import { applyMagnet, shielded, hitShield, clashPermanentShield, guardHit, apply
 import { fmt } from './util';
 import {
   TEAMS, N, BX, BY, BS, CS, MR, SHIELD_R, CANNON_HIT_R,
-  PR, BBR, BOMB_RC, NBR, NUKE_R, NUKE_SPEED, NUKE_FADE, BOMB_SPEED, NUKE_BALL_SPEED,
+  PR, BBR, BOMB_RC, NBR, NUKE_R, NUKE_SPEED, NUKE_FADE, NUKE_CLAIM_R, BOMB_SPEED, NUKE_BALL_SPEED,
   SKILL_R_HP_REF, SKILL_R_GROW, SKILL_R_MAX, HOMING_SPEED, HOMING_TURN, HBR,
   GUARD_RAD, GUARD_THICK, PROJ_SPAWN_OFF,
 } from '../config/config';
@@ -290,9 +290,13 @@ export function updateNukes(s: GameState, h: number): void {
   }
   s.nukeBalls = out;
 }
-// 冲击波把覆盖到的格子染成 owner 色(随扩散渐进染色,每前进约一格才扫一次,省性能)
+// 冲击波把覆盖到的格子染成 owner 色。染色半径独立且更小(NUKE_CLAIM_R,默认冲击波一半),
+// 随扩散渐进染色,每前进约一格才扫一次(省性能)。
 function claimShockCells(s: GameState, w: Shockwave): void {
-  const r2 = w.r * w.r, pr2 = w.claimR * w.claimR, rc = w.r / CS;
+  const claimTo = Math.min(w.r, NUKE_CLAIM_R);
+  if (claimTo <= w.claimR) return;
+  if (claimTo - w.claimR < CS && claimTo < NUKE_CLAIM_R) return;   // 前进不足一格且未到上限,先攒着
+  const r2 = claimTo * claimTo, pr2 = w.claimR * w.claimR, rc = claimTo / CS;
   const cxCell = (w.x - BX) / CS, cyCell = (w.y - BY) / CS;
   const i0 = Math.max(0, Math.floor(cxCell - rc)), i1 = Math.min(N - 1, Math.ceil(cxCell + rc));
   const j0 = Math.max(0, Math.floor(cyCell - rc)), j1 = Math.min(N - 1, Math.ceil(cyCell + rc));
@@ -301,7 +305,7 @@ function claimShockCells(s: GameState, w: Shockwave): void {
     const d2 = dx * dx + dy * dy;
     if (d2 <= r2 && d2 > pr2) paintCell(s, i, j, w.c);
   }
-  w.claimR = w.r;
+  w.claimR = claimTo;
 }
 
 export function updateShockwaves(s: GameState, h: number): void {
@@ -310,7 +314,7 @@ export function updateShockwaves(s: GameState, h: number): void {
     if (w.r < NUKE_R) {
       w.r = Math.min(NUKE_R, w.r + NUKE_SPEED * h);
       engulf(s, w.x, w.y, w.r * w.r, w.c);
-      if (w.r - w.claimR >= CS || w.r >= NUKE_R) claimShockCells(s, w);   // 沿途染色:核弹变更地块所属
+      claimShockCells(s, w);   // 沿途染色(半径封顶 NUKE_CLAIM_R):核弹变更地块所属
       out.push(w);
     } else {
       // 已到最大半径:继续吞噬,并在 NUKE_FADE 秒内逐渐淡出(不再突兀消失)
