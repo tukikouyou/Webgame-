@@ -10,10 +10,12 @@ import { setPaused } from './controls';
 const setupEl = document.getElementById('setup')!;
 const setupGrid = document.getElementById('setupGrid')!;
 const metaEl = document.getElementById('setupMeta')!;
+const cancelBtn = document.getElementById('btnCancelSetup')!;
 
 export function initSetup(app: App): () => void {
   let setupTrait: TraitKey[] = app.state.cfg.trait.slice();
   let playerIdx = app.state.playerIdx;
+  let started = false;   // 是否已经开过至少一局(决定"返回对局"是否可用)
 
   function renderMetaPanel(): void {
     const m = app.meta;
@@ -87,7 +89,10 @@ export function initSetup(app: App): () => void {
 
   function openSetup(): void {
     setupTrait = app.state.cfg.trait.slice();
+    playerIdx = app.state.playerIdx;
     buildSetup();
+    // 仅在对局进行中(已开过局且未结束)才显示"返回对局";首次进入/已分胜负时隐藏
+    cancelBtn.style.display = (started && !app.state.gameOver) ? '' : 'none';
     setupEl.classList.remove('hidden');
     setPaused(app, true);
   }
@@ -96,7 +101,14 @@ export function initSetup(app: App): () => void {
     app.state.cfg.trait = setupTrait.slice();
     app.state.playerIdx = playerIdx;
     setupEl.classList.add('hidden');
+    started = true;
     app.newGame();
+  };
+
+  // 返回对局:关闭界面并继续当前对局(不重置)——防止误点"选择炮台"被迫重开
+  cancelBtn.onclick = () => {
+    setupEl.classList.add('hidden');
+    setPaused(app, false);
   };
 
   return openSetup;

@@ -42,6 +42,9 @@
   .traitDesc{font-size:11.5px;color:#999;line-height:1.5;min-height:32px;}
   .startBtn{margin-top:18px;width:100%;padding:12px;font-size:16px;font-weight:bold;
             background:#3ad07f;color:#04210f;border:none;border-radius:8px;cursor:pointer;}
+  .backBtn{margin-top:8px;width:100%;padding:10px;font-size:14px;
+           background:#16161b;color:#ccc;border:1px solid #2a2a30;border-radius:8px;cursor:pointer;}
+  .backBtn:hover{border-color:#555;}
   /* ---- 调试面板 ---- */
   #debug{justify-content:flex-end;align-items:stretch;background:rgba(5,5,8,0.35);}
   #debug .modal{width:min(440px,92vw);border-radius:0;}
@@ -115,6 +118,7 @@
     <div class="teamGrid" id="setupGrid"></div>
     <div id="setupMeta" class="setupMeta"></div>
     <button class="startBtn" id="btnStart">开始对战 ▶</button>
+    <button class="backBtn" id="btnCancelSetup" style="display:none;">↩ 返回对局(不重开)</button>
   </div>
 </div>
 <!-- 调试面板 -->
