@@ -72,6 +72,7 @@ export function respawnEnemies(s: GameState, m: MetaState): number {
     // 补充面板球
     for (let n = 0; n < PLINKO_INIT_BALLS; n++) s.plinkoBalls.push(newPlinkoBall(s, c.idx));
   }
+  s.eventBanner = { name: '第 ' + w + ' 波', icon: '🌊', t: 3, max: 3 };   // 中央大横幅,明确是新波次而非重开
   toast(s, '🌊 第 ' + w + ' 波来袭!敌方 AI 已复活并强化', TEAMS[s.playerIdx].ball);
   return w;
 }

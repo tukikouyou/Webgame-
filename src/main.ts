@@ -17,6 +17,7 @@ import { settleVictory, finalWave } from './core/meta';
 import { respawnEnemies } from './core/wave';
 import { waveChoices, type Choice } from './core/events';
 import { toast } from './core/fx';
+import { applyDamage } from './core/damage';
 import { TEAMS, LOOP_MAX_DT, LOOP_SUBSTEP, LOOP_MAX_SUBSTEPS } from './config/config';
 
 const cv = document.getElementById('cv') as HTMLCanvasElement;
@@ -119,7 +120,7 @@ openSetup();
 
 // 开发期调试钩子:便于无头环境手动驱动/采样(生产构建不含)
 if ((import.meta as any).env?.DEV) {
-  (window as any).__marble = { app, step, render, ctx, slotEffect, triggerSkill, ultimateSkill, waveChoices, orchestrate, advanceIfCleared };
+  (window as any).__marble = { app, step, render, ctx, slotEffect, triggerSkill, ultimateSkill, waveChoices, orchestrate, advanceIfCleared, applyDamage };
 }
 
 let prev = performance.now();

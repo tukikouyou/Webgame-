@@ -6,7 +6,6 @@ import { updatePierce, updateBombs, updateNukes, updateHoming, updateShockwaves 
 import { updatePlinko } from './plinko';
 import { updateWheel } from './wheel';
 import { updateUltimate } from './ultimate';
-import { checkWin } from './damage';
 import { updateParticles, updateWaves, updateToasts } from './fx';
 import { updateEvents } from './events';
 import { TEAMS, W } from '../config/config';
@@ -25,7 +24,7 @@ export function step(s: GameState, h: number): void {
     updateWheel(s, h);
     updateUltimate(s, h);
     updateEvents(s, h);
-    checkWin(s, h);
+    // 胜负与波次推进由 main.orchestrate 统一管理(旧的 checkWin 会误判"只剩玩家=结束",已移除)
   } else if (s.winner) {
     s.confettiT -= h;
     if (s.confettiT <= 0) {
