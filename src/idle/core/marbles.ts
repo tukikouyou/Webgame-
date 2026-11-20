@@ -46,12 +46,10 @@ export function updateMarbles(s: GameState, h: number): void {
   const H = fieldHeightPx();
   const rightWall = Math.min(r.fieldEnd, genEnd(s)) * T.cellPx;
   const leftKill = cannonX(s) - 60;
-  const damp = Math.exp(-T.marbleDampPerSec * h);
   const b = r.boss;
   const out = [];
   for (const m of s.marbles) {
     m.life -= h;
-    m.vx *= damp; m.vy *= damp;
     const px = m.x, py = m.y;
     m.x += m.vx * h; m.y += m.vy * h;
     if (m.y < MR) { m.y = MR; m.vy = Math.abs(m.vy); }
@@ -97,7 +95,7 @@ export function updateMarbles(s: GameState, h: number): void {
       }
     }
 
-    if (dead || m.life <= 0 || m.x < leftKill || m.vx * m.vx + m.vy * m.vy < 400) continue;
+    if (dead || m.life <= 0 || m.x < leftKill) continue;
     out.push(m);
   }
   s.marbles = out;

@@ -32,7 +32,7 @@ export const T = {
   enemySpeed: 150, enemyCap: 300,
 
   // ---- 我方弹珠 ----
-  marbleSpeed: 230, marbleDampPerSec: 0.25, marbleLife: 10,
+  marbleSpeed: 230, marbleLife: 10,   // 弹珠不减速,飞行 marbleLife 秒后消失
   marbleCap: 400,              // 场上弹珠上限(超出就合并成大弹珠)
   emitRate: 150,               // 每秒发出弹珠数
   salvoSeconds: 2,             // 一次齐射大约多少秒打完
