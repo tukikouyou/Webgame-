@@ -1,7 +1,9 @@
-/* 钉板:落球物理(照搬原作)、特殊钉加弹药、落槽效果(空槽/倍增/发射),蓄力达到发射上限时自动发射。 */
+/* 钉板:落球物理(照搬原作)、特殊钉加弹药、落槽效果(空槽/倍增/发射),蓄力达到发射上限时自动发射。
+   boss 钉板(高维度)与我方共用同一套落球几何。 */
 import { T } from '../config/tuning';
-import type { GameState, Ball, SlotKind } from './types';
-import { addSalvo } from './marbles';
+import type { GameState, Ball, Boss, SlotKind } from './types';
+import { addSalvo, spawnEnemy } from './marbles';
+import { bossX, bossY } from './field';
 import { baseAmmo, capValue, mulM, pegYield, ballCount, cardN, maxFuncUnits } from './economy';
 
 export interface PegPos { x: number; y: number; }
@@ -34,18 +36,30 @@ export const PEG_COLOR_NAMES = ['暴击', '本体', '分裂', '金币', '炸弹'
 export interface SlotUnit { kind: SlotKind; color: string; card: boolean; }
 const KIND_COLOR: Record<SlotKind, string> = { empty: '#3a3a44', mul: '#2f6fd6', fire: '#d64545' };
 
-/* 底部 12 格的布局:功能格在整排均匀分布,倍增/发射交错 */
+/* 我方底部 12 格的布局 */
 export function computeLayout(s: GameState): SlotUnit[] {
-  const n = T.slotUnits;
   const unlocked = Math.min(s.epoch.funcUnlocked, maxFuncUnits(s));
   const mul = Math.max(0, Math.min(s.epoch.mulAlloc, unlocked - 1));
   const fire = unlocked - mul;
-  const groups: { unit: SlotUnit; count: number }[] = [
+  return arrangeSlots([
     { unit: { kind: 'mul', color: KIND_COLOR.mul, card: false }, count: mul },
     { unit: { kind: 'fire', color: KIND_COLOR.fire, card: false }, count: fire },
     { unit: { kind: 'mul', color: '#5aa9ff', card: true }, count: cardN(s, 'mulSlot') },
     { unit: { kind: 'fire', color: '#ff6b6b', card: true }, count: cardN(s, 'fireSlot') },
-  ];
+  ]);
+}
+
+/* boss 钉板的布局(固定) */
+export function bossLayout(): SlotUnit[] {
+  return arrangeSlots([
+    { unit: { kind: 'mul', color: KIND_COLOR.mul, card: false }, count: T.bossBoardMul },
+    { unit: { kind: 'fire', color: KIND_COLOR.fire, card: false }, count: T.bossBoardFire },
+  ]);
+}
+
+/* 功能格在整排均匀分布,各类交错 */
+function arrangeSlots(groups: { unit: SlotUnit; count: number }[]): SlotUnit[] {
+  const n = T.slotUnits;
   const items: { key: number; unit: SlotUnit }[] = [];
   for (const g of groups) for (let j = 0; j < g.count; j++) items.push({ key: (j + 0.5) / g.count, unit: g.unit });
   items.sort((a, b) => a.key - b.key);
@@ -71,41 +85,85 @@ export function updatePlinko(s: GameState, h: number): void {
   const layout = computeLayout(s);
   const owned = new Map<number, number>();  // 特殊钉位 → 等级
   for (const p of s.epoch.pegs) owned.set(p.slot, p.level);
-  const bottom = T.PY + T.PH - T.SLOT_H - T.PBR;
 
   for (const b of s.balls) {
-    b.vy += T.plinkoGravity * h;
-    b.x += b.vx * h; b.y += b.vy * h;
-    if (b.x < T.PX + T.PBR) { b.x = T.PX + T.PBR; b.vx = Math.abs(b.vx) * 0.8; }
-    if (b.x > T.PX + T.PW - T.PBR) { b.x = T.PX + T.PW - T.PBR; b.vx = -Math.abs(b.vx) * 0.8; }
-    for (let i = 0; i < PEGS.length; i++) {
-      const p = PEGS[i];
-      const dx = b.x - p.x, dy = b.y - p.y, rr = T.PBR + 4, d2 = dx * dx + dy * dy;
-      if (d2 < rr * rr && d2 > 0.0001) {
-        const d = Math.sqrt(d2), nx = dx / d, ny = dy / d;
-        b.x = p.x + nx * rr; b.y = p.y + ny * rr;
-        const dot = b.vx * nx + b.vy * ny;
-        if (dot < 0) { b.vx -= 1.75 * dot * nx; b.vy -= 1.75 * dot * ny; }
-        b.vx += s.rng.range(-25, 25);
-        if (b.lastPeg !== i) {
-          b.lastPeg = i;
-          const slot = SPECIAL.indexOf(i);
-          const lv = slot >= 0 ? owned.get(slot) : undefined;
-          if (lv !== undefined) {
-            s.run.ammo += pegYield(lv);
-            s.pegFlash[slot] = 0.3;
-          }
-        }
+    const u = moveBall(s, b, h, i => {
+      const slot = SPECIAL.indexOf(i);
+      const lv = slot >= 0 ? owned.get(slot) : undefined;
+      if (lv !== undefined) {
+        s.run.ammo += pegYield(lv);
+        s.pegFlash[slot] = 0.3;
       }
-    }
-    if (b.y > bottom) {
-      const u = Math.min(T.slotUnits - 1, Math.max(0, Math.floor((b.x - T.PX) / T.PW * T.slotUnits)));
+    });
+    if (u >= 0) {
       slotEffect(s, layout[u].kind);
       s.slotFlash[u] = 0.35;
-      Object.assign(b, newBall(s));
     }
   }
   if (s.run.ammo >= capValue(s)) doFire(s);   // 蓄满发射上限 → 自动发射
+}
+
+/* 推进一颗球(玩家与 boss 钉板共用同一套几何);落到底返回落槽下标并换成新球,否则返回 −1。
+   球第一次碰到某颗钉子时调用 onPeg(钉子下标)。 */
+function moveBall(s: GameState, b: Ball, h: number, onPeg?: (pegIndex: number) => void): number {
+  b.vy += T.plinkoGravity * h;
+  b.x += b.vx * h; b.y += b.vy * h;
+  if (b.x < T.PX + T.PBR) { b.x = T.PX + T.PBR; b.vx = Math.abs(b.vx) * 0.8; }
+  if (b.x > T.PX + T.PW - T.PBR) { b.x = T.PX + T.PW - T.PBR; b.vx = -Math.abs(b.vx) * 0.8; }
+  for (let i = 0; i < PEGS.length; i++) {
+    const p = PEGS[i];
+    const dx = b.x - p.x, dy = b.y - p.y, rr = T.PBR + 4, d2 = dx * dx + dy * dy;
+    if (d2 < rr * rr && d2 > 0.0001) {
+      const d = Math.sqrt(d2), nx = dx / d, ny = dy / d;
+      b.x = p.x + nx * rr; b.y = p.y + ny * rr;
+      const dot = b.vx * nx + b.vy * ny;
+      if (dot < 0) { b.vx -= 1.75 * dot * nx; b.vy -= 1.75 * dot * ny; }
+      b.vx += s.rng.range(-25, 25);
+      if (b.lastPeg !== i) { b.lastPeg = i; if (onPeg) onPeg(i); }
+    }
+  }
+  if (b.y <= T.PY + T.PH - T.SLOT_H - T.PBR) return -1;
+  const u = Math.min(T.slotUnits - 1, Math.max(0, Math.floor((b.x - T.PX) / T.PW * T.slotUnits)));
+  Object.assign(b, newBall(s));
+  return u;
+}
+
+/* ---- boss 钉板(第 bossBoardDim 维起):攒弹药、倍增,落进发射槽或蓄满时齐射一波敌方弹珠,
+   叠加在 boss 的常规火力之上 ---- */
+export function updateBossBoard(s: GameState, h: number): void {
+  const b = s.run.boss;
+  if (!b || !b.alive || !b.board) { s.bossBalls.length = 0; return; }
+  while (s.bossBalls.length < T.bossBoardBalls) {
+    const nb = newBall(s);
+    nb.y -= s.bossBalls.length * 12;
+    s.bossBalls.push(nb);
+  }
+  if (s.bossBalls.length > T.bossBoardBalls) s.bossBalls.length = T.bossBoardBalls;
+
+  const layout = bossLayout();
+  for (const ball of s.bossBalls) {
+    const u = moveBall(s, ball, h);
+    if (u < 0) continue;
+    b.bAmmo += T.bossBoardAmmo;
+    const kind = layout[u].kind;
+    if (kind === 'mul') { b.bAmmo *= 1 + Math.pow(T.mulDecay, b.bMultK - 1); b.bMultK++; }
+    else if (kind === 'fire') bossBoardFire(b);
+  }
+  if (b.bAmmo >= T.bossSalvoCap) bossBoardFire(b);
+
+  b.bEmitAcc += T.bossSalvoRate * h;
+  while (b.bEmitAcc >= 1 && b.bQueue >= 1) {
+    b.bEmitAcc -= 1;
+    b.bQueue -= 1;
+    spawnEnemy(s, bossX(b), bossY(b));
+  }
+  if (b.bQueue < 1) b.bEmitAcc = 0;
+}
+
+function bossBoardFire(b: Boss): void {
+  b.bQueue += Math.min(Math.floor(b.bAmmo), T.bossSalvoCap);
+  b.bAmmo = 0;
+  b.bMultK = 1;
 }
 
 /* 每颗球落进任何槽都先带来「底弹」数量的弹药,再结算槽效果(空槽只有底弹) */

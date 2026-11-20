@@ -49,6 +49,7 @@ export function freshLegacy(): LegacyState {
 export function clearTransient(s: GameState): void {
   s.marbles = [];
   s.enemies = [];
+  s.bossBalls = [];
   s.sparks = [];
   s.incomePerSec = 0;
 }
@@ -63,6 +64,7 @@ export function createState(seed: number): GameState {
     legacy,
     settings: { autoUp: true, autoRebirth: false, autoSkip: { dmg: false, cap: false, base: false } },
     balls: [],
+    bossBalls: [],
     marbles: [],
     enemies: [],
     toasts: [],

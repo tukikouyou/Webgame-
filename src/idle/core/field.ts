@@ -1,6 +1,6 @@
 /* 战场:列的生成与巩固、前线计算、区域能量结算、boss、金币收入。 */
 import { T } from '../config/tuning';
-import type { GameState, Column } from './types';
+import type { GameState, Column, Boss } from './types';
 import { colInfo, cellHp, colsPerDim, regionValue, bossRegionNo } from './grid';
 import { coinMul } from './economy';
 import { toast, bigFlash } from './fx';
@@ -32,13 +32,19 @@ function ensureBoss(s: GameState): void {
   spawnBoss(s, dim, (dim - 1) * colsPerDim() + T.regionsPerDim * T.regionCols);
 }
 
+/* boss 站在 boss 区最右端的墙上(col 记为 boss 区最后一列),区内每一格都打得到 */
 function spawnBoss(s: GameState, dim: number, regionStart: number): void {
   const hpMax = T.bossHpRatio * T.regionCols * T.rows * cellHp(regionStart);
   s.run.boss = {
-    dim, col: regionStart + T.regionCols - 8, row: Math.floor(T.rows / 2),
+    dim, col: regionStart + T.regionCols - 1, row: Math.floor(T.rows / 2),
     hp: hpMax, hpMax, shieldBroken: false, alive: true, p: 0, fireAcc: 0, bestP: 0, bestHp: 1,
+    board: dim >= T.bossBoardDim, bAmmo: 0, bMultK: 1, bQueue: 0, bEmitAcc: 0,
   };
 }
+
+/* boss 的世界坐标:x 在 boss 区右边界(墙上) */
+export function bossX(b: Boss): number { return (b.col + 1) * T.cellPx; }
+export function bossY(b: Boss): number { return (b.row + 0.5) * T.cellPx; }
 
 /* 占领一格:归我、回满我方格子血量、发占领奖励 */
 export function capture(s: GameState, c: number, row: number, col: Column): void {
@@ -134,7 +140,7 @@ export function updateBoss(s: GameState, h: number, spawnEnemy: (x: number, y: n
   b.fireAcc += rate * h;
   while (b.fireAcc >= 1) {
     b.fireAcc -= 1;
-    spawnEnemy((b.col + 0.5) * T.cellPx, (b.row + 0.5) * T.cellPx);
+    spawnEnemy(bossX(b), bossY(b));
   }
 }
 

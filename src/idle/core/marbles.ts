@@ -2,14 +2,14 @@
    坐标是战场世界坐标:x = 列号 × cellPx,y ∈ [0, rows × cellPx)。 */
 import { T } from '../config/tuning';
 import type { GameState } from './types';
-import { getCol, genEnd, capture, damageBoss } from './field';
+import { getCol, genEnd, capture, damageBoss, bossY } from './field';
 import { cellHp } from './grid';
 import { dmgValue, salvoMul } from './economy';
 import { spark } from './fx';
 
 export const MR = 3.5;          // 弹珠半径
-export const BOSS_R = 16;
-export const SHIELD_R = 26;
+export const BOSS_R = 24;       // boss 在墙上,飞到墙且离 boss 中心 ±BOSS_R 以内的弹珠算命中
+export const SHIELD_R = 30;
 
 export function fieldHeightPx(): number { return T.rows * T.cellPx; }
 export function cannonX(s: GameState): number { return (s.run.front - T.cannonBehind + 0.5) * T.cellPx; }
@@ -54,7 +54,8 @@ export function updateMarbles(s: GameState, h: number): void {
     m.x += m.vx * h; m.y += m.vy * h;
     if (m.y < MR) { m.y = MR; m.vy = Math.abs(m.vy); }
     else if (m.y > H - MR) { m.y = H - MR; m.vy = -Math.abs(m.vy); }
-    if (m.x > rightWall - MR) { m.x = rightWall - MR; m.vx = -Math.abs(m.vx); }
+    const atWall = m.x > rightWall - MR;
+    if (atWall) m.x = rightWall - MR;
 
     let dead = false;
     const dx = m.x - px, dy = m.y - py;
@@ -83,16 +84,17 @@ export function updateMarbles(s: GameState, h: number): void {
       }
     }
 
-    if (!dead && b && b.alive) {
-      const bx = (b.col + 0.5) * T.cellPx, by = (b.row + 0.5) * T.cellPx;
-      const d2 = (m.x - bx) * (m.x - bx) + (m.y - by) * (m.y - by);
-      if (!b.shieldBroken && d2 < SHIELD_R * SHIELD_R) {
+    // boss 在 boss 区右端的墙上:只有飞到墙、且正好在 boss 那几行的弹珠才打中 boss(或被护盾挡下)
+    if (!dead && atWall) {
+      const hitBand = b && b.alive && rightWall >= r.fieldEnd * T.cellPx
+        && Math.abs(m.y - bossY(b)) < (b.shieldBroken ? BOSS_R : SHIELD_R);
+      if (hitBand && b) {
         dead = true; spark(s, m.x, m.y, '#ffffff');
-      } else if (b.shieldBroken && d2 < BOSS_R * BOSS_R) {
-        dead = true; spark(s, m.x, m.y, '#ffffff');
-        damageBoss(s, m.dmg);
-        if (!b.alive) return;   // boss 被击杀时已清场,不能再把本帧存活的弹珠写回去
-      }
+        if (b.shieldBroken) {
+          damageBoss(s, m.dmg);
+          if (!b.alive) return;   // boss 被击杀时已清场,不能再把本帧存活的弹珠写回去
+        }
+      } else m.vx = -Math.abs(m.vx);
     }
 
     if (dead || m.life <= 0 || m.x < leftKill) continue;

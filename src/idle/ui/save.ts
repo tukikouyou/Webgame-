@@ -1,5 +1,7 @@
 /* localStorage 存档:只存四层成长和设置,不存球/弹珠/特效等瞬时对象。 */
 import type { GameState } from '../core/types';
+import { T } from '../config/tuning';
+import { colInfo } from '../core/grid';
 
 /* 地址带 ?sim 时用独立存档(跑数值模拟用,不碰正常存档) */
 const KEY = 'marble-idle-demo-v1' + (new URLSearchParams(location.search).has('sim') ? '-sim' : '');
@@ -27,6 +29,11 @@ export function loadGame(s: GameState): boolean {
     Object.assign(s.settings, d.settings);
     s.settings.autoSkip = { dmg: false, cap: false, base: false, ...d.settings?.autoSkip };
     s.history = Array.isArray(d.history) ? d.history : [];
+    const b = s.run.boss;
+    if (b) {   // 旧存档里的 boss:挪到 boss 区右端的墙上,补齐钉板字段
+      b.col = colInfo(b.col).regionStart + T.regionCols - 1;
+      if (b.board === undefined) Object.assign(b, { board: b.dim >= T.bossBoardDim, bAmmo: 0, bMultK: 1, bQueue: 0, bEmitAcc: 0 });
+    }
     return true;
   } catch { return false; }
 }

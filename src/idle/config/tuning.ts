@@ -32,6 +32,13 @@ export const T = {
   bossFire: 7,                 // 前线进入 boss 区后 boss 每秒发射数
   enemyDmgMul: 1,              // 敌方弹珠威力 = 所在区格子满血 × 此值(飞进哪个区就按哪个区算)
   enemySpeed: 150, enemyCap: 300,
+  // boss 钉板:从第 bossBoardDim 维起,boss 也有一块钉板,齐射叠加在常规火力上
+  bossBoardDim: 6,
+  bossBoardBalls: 2,           // boss 钉板上的球数
+  bossBoardMul: 3, bossBoardFire: 2,   // boss 钉板的倍增格 / 发射格数(其余为空槽)
+  bossBoardAmmo: 1,            // 每颗球落槽带来的弹药
+  bossSalvoCap: 40,            // boss 一次齐射最多几颗(蓄满也会自动发射)
+  bossSalvoRate: 20,           // boss 齐射时每秒射出几颗
 
   // ---- 我方弹珠 ----
   marbleSpeed: 230, marbleLife: 10,   // 弹珠不减速,飞行 marbleLife 秒后消失
@@ -85,6 +92,9 @@ export const TUNABLE: [keyof Tuning, string][] = [
   ['bossFireBase', 'boss 第 1 区发射(颗/秒)'],
   ['bossFireStep', 'boss 每区多发(颗/秒)'],
   ['bossFire', 'boss 区发射(颗/秒)'],
+  ['bossBoardDim', 'boss 钉板起始维度'],
+  ['bossBoardBalls', 'boss 钉板球数'],
+  ['bossSalvoCap', 'boss 齐射上限(颗)'],
   ['bossRegen', 'boss 每秒回血比例'],
   ['dmgMul', '伤害每级倍率'],
   ['dmgCostMul', '伤害价格每级倍率'],

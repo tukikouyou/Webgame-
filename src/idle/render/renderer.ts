@@ -1,8 +1,8 @@
-/* 总渲染:钉板(左)、HUD(右上)、战场(右中)、消息(右下)。只读 state。 */
+/* 总渲染:钉板(左)、HUD(右上)、boss 钉板(最右上)、战场(右中)、消息(右下)。只读 state。 */
 import { T } from '../config/tuning';
 import type { GameState } from '../core/types';
-import { PEGS, SPECIAL, PEG_COLORS, computeLayout } from '../core/plinko';
-import { getCol, genEnd, bossRegionStart } from '../core/field';
+import { PEGS, SPECIAL, PEG_COLORS, computeLayout, bossLayout } from '../core/plinko';
+import { getCol, genEnd, bossRegionStart, bossX, bossY } from '../core/field';
 import { colInfo, cellHp, regionLabel } from '../core/grid';
 import { MR, BOSS_R, SHIELD_R, cannonX, fieldHeightPx } from '../core/marbles';
 import { fmt, fmtTime } from '../core/format';
@@ -24,6 +24,7 @@ export function render(ctx: CanvasRenderingContext2D, s: GameState): void {
   ctx.fillRect(0, 0, T.W, T.H);
   drawPlinko(ctx, s);
   drawHud(ctx, s);
+  drawBossBoard(ctx, s);
   drawField(ctx, s);
   drawMessages(ctx, s);
   if (s.bigFlash) {
@@ -129,6 +130,36 @@ function drawPlinko(ctx: CanvasRenderingContext2D, s: GameState): void {
   for (const b of s.balls) {
     ctx.beginPath(); ctx.arc(b.x, b.y, T.PBR, 0, Math.PI * 2); ctx.fill();
   }
+}
+
+/* ---------------- boss 钉板(右上角,按 0.4 缩小绘制;和我方钉板同一套几何) ---------------- */
+function drawBossBoard(ctx: CanvasRenderingContext2D, s: GameState): void {
+  const b = s.run.boss;
+  if (!b || !b.alive || !b.board) return;
+  const k = 0.4, x0 = T.W - 14 - T.PW * k, y0 = T.PY;
+  const X = (x: number) => x0 + (x - T.PX) * k;
+  const Y = (y: number) => y0 + (y - T.PY) * k;
+  ctx.fillStyle = '#16100f';
+  ctx.fillRect(x0, y0, T.PW * k, T.PH * k);
+  ctx.strokeStyle = '#5a2a2a';
+  ctx.strokeRect(x0 + 0.5, y0 + 0.5, T.PW * k - 1, T.PH * k - 1);
+  ctx.fillStyle = '#ff9a8a';
+  ctx.font = 'bold 11px "Microsoft YaHei",sans-serif';
+  ctx.fillText('BOSS 钉板', x0 + 5, y0 + 13);
+  ctx.fillStyle = '#ccc';
+  ctx.font = '10px "Microsoft YaHei",sans-serif';
+  ctx.fillText('蓄力 ' + Math.floor(b.bAmmo) + '/' + T.bossSalvoCap + (b.bQueue >= 1 ? ' · 齐射中' : ''), x0 + 5, y0 + 26);
+  ctx.fillStyle = '#5b4444';
+  for (const p of PEGS) { ctx.beginPath(); ctx.arc(X(p.x), Y(p.y), 1.6, 0, Math.PI * 2); ctx.fill(); }
+  const layout = bossLayout();
+  const uw = T.PW * k / T.slotUnits;
+  const sy = Y(T.PY + T.PH - T.SLOT_H);
+  for (let u = 0; u < T.slotUnits; u++) {
+    ctx.fillStyle = layout[u].color;
+    ctx.fillRect(x0 + u * uw + 0.5, sy, uw - 1, T.SLOT_H * k - 1);
+  }
+  ctx.fillStyle = '#ffb0a0';
+  for (const ball of s.bossBalls) { ctx.beginPath(); ctx.arc(X(ball.x), Y(ball.y), T.PBR * k + 0.6, 0, Math.PI * 2); ctx.fill(); }
 }
 
 /* ---------------- HUD ---------------- */
@@ -272,7 +303,7 @@ function drawField(ctx: CanvasRenderingContext2D, s: GameState): void {
   // boss
   const b = r.boss;
   if (b && b.alive) {
-    const px = ox + (b.col + 0.5) * cs, py = oy + (b.row + 0.5) * cs;
+    const px = ox + bossX(b), py = oy + bossY(b);   // boss 站在 boss 区右端的墙上
     if (!b.shieldBroken) {
       ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 3;
       ctx.beginPath(); ctx.arc(px, py, SHIELD_R, 0, Math.PI * 2); ctx.stroke();

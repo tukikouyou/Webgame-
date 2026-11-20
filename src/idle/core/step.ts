@@ -2,7 +2,7 @@
 import { T } from '../config/tuning';
 import type { GameState } from './types';
 import { ensureColumns, updateFront, updateBoss, incomePerSec } from './field';
-import { updatePlinko } from './plinko';
+import { updatePlinko, updateBossBoard } from './plinko';
 import { emitMarbles, updateMarbles, updateEnemies, spawnEnemy } from './marbles';
 import { autoBuy } from './economy';
 import { canRebirth, doRebirth } from './prestige';
@@ -16,6 +16,7 @@ export function step(s: GameState, h: number): void {
   ensureColumns(s);
 
   updatePlinko(s, h);
+  updateBossBoard(s, h);
 
   emitMarbles(s, h);
   updateMarbles(s, h);

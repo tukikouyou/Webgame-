@@ -15,6 +15,8 @@ export interface Boss {
   p: number;            // boss 区我方占领比例
   fireAcc: number;
   bestP: number; bestHp: number;   // 本轮 boss 战的最好进展(判定撞墙用)
+  // boss 钉板(第 bossBoardDim 维起)
+  board: boolean; bAmmo: number; bMultK: number; bQueue: number; bEmitAcc: number;
 }
 
 export interface RunState {
@@ -83,6 +85,7 @@ export interface GameState {
   settings: Settings;
   // 瞬时
   balls: Ball[];
+  bossBalls: Ball[];
   marbles: Marble[];
   enemies: EnemyMarble[];
   toasts: Toast[];
