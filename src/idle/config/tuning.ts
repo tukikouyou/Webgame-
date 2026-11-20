@@ -28,8 +28,8 @@ export const T = {
   bossShieldRatio: 0.1,        // boss 区敌格占比 ≤ 此值时护盾破除
   bossRegen: 0.02,             // boss 每秒回复最大血量的比例
   // 敌方弹珠全部由 boss 发射,每一维开局就开火
-  bossFireBase: 0.5,           // 前线在第 1 区时 boss 每秒发射数
-  bossFireStep: 0.5,           // 前线每推进一个普通区,每秒多发这么多
+  bossFireBase: 1,             // 前线在第 1 区时 boss 每秒发射数
+  bossFireStep: 1.5,           // 前线每推进一个普通区,每秒多发这么多(1 → 2.5 → 4 → boss 区 7)
   bossFire: 7,                 // 前线进入 boss 区后 boss 每秒发射数
   bossFullFireDim: 6,          // 从第几维起 boss 整个维度都按 boss 区火力发射(不再按区递增)
   enemyDmgMul: 1,              // 敌方弹珠威力 = 所在区格子满血 × 此值(飞进哪个区就按哪个区算)
