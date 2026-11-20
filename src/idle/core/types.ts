@@ -21,8 +21,8 @@ export interface RunState {
   coins: number;
   up: Record<UpKind, number>;
   // 钉板蓄力
-  ammo: number; multK: number; sinceFire: number;
-  capBinding: boolean;                  // 上一次齐射是否被弹药上限截断
+  ammo: number; multK: number;
+  capBinding: boolean;                  // 上一次齐射是否是蓄满发射上限触发的
   // 待发射
   queue: number; perMarble: number; emitAcc: number;
   firedAcc: number; ammoRate: number;   // 齐射弹药速率(指数平均),用于估算火力

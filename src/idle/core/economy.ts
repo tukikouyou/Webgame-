@@ -21,7 +21,7 @@ export function capValue(s: GameState): number {
 export function baseAmmo(s: GameState): number { return T.baseAmmo0 * Math.pow(T.baseAmmoMul, s.run.up.base); }
 
 export const UP_KINDS: UpKind[] = ['dmg', 'cap', 'base'];
-export const UP_NAMES: Record<UpKind, string> = { dmg: '伤害', cap: '弹药上限', base: '底弹' };
+export const UP_NAMES: Record<UpKind, string> = { dmg: '伤害', cap: '发射上限', base: '底弹' };
 
 export function upCost(kind: UpKind, level: number): number {
   if (kind === 'dmg') return T.dmgCost0 * Math.pow(T.dmgCostMul, level);
@@ -37,7 +37,7 @@ export function buyUp(s: GameState, kind: UpKind): boolean {
   return true;
 }
 
-/* 自动升级:反复买「买得起的最便宜项目」;弹药上限只在它截断了齐射时才买 */
+/* 自动升级:反复买「买得起的最便宜项目」;发射上限只在最近一次齐射是蓄满触发时才买 */
 export function autoBuy(s: GameState): void {
   for (let n = 0; n < 60; n++) {
     let best: UpKind | null = null, bestCost = Infinity;

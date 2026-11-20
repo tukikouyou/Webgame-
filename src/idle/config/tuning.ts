@@ -40,7 +40,6 @@ export const T = {
   // ---- 钉板 / 弹药 ----
   initBalls: 2, slotUnits: 12, startMul: 2, startFire: 2,
   mulDecay: 0.7,               // 第 k 次倍增 = 1 + m × mulDecay^(k−1)
-  fireGuarantee: 20,           // 多少秒没发射就自动发射
   pegSlots: 8,                 // 特殊钉位数量
   pegYield0: 25, pegYieldMul: 1.6,   // 特殊钉每次被撞:弹药 + pegYield0 × pegYieldMul^(等级−1)
 
@@ -84,7 +83,8 @@ export const TUNABLE: [keyof Tuning, string][] = [
   ['bossFire', 'boss 开火(弹珠/秒)'],
   ['dmgMul', '伤害每级倍率'],
   ['dmgCostMul', '伤害价格每级倍率'],
-  ['capMul', '弹药上限每级倍率'],
+  ['capBase', '发射上限初始值'],
+  ['capMul', '发射上限每级倍率'],
   ['baseAmmo0', '底弹初始值'],
   ['mulDecay', '倍增递减系数'],
   ['pegYield0', '钉子基础弹药'],
@@ -95,7 +95,6 @@ export const TUNABLE: [keyof Tuning, string][] = [
   ['energyRegionMul', '能量每区倍率'],
   ['crushRatio', '碾压阈值'],
   ['autoRebirthSec', '自动转生秒数'],
-  ['fireGuarantee', '发射保底秒数'],
   ['epochDim', '终结纪元所需维度'],
   ['legacyDim', '传承所需维度'],
 ];

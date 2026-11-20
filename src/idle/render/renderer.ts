@@ -57,15 +57,15 @@ function drawPlinko(ctx: CanvasRenderingContext2D, s: GameState): void {
   const cap = capValue(s);
   ctx.fillStyle = '#9aa';
   ctx.font = '12px "Microsoft YaHei",sans-serif';
-  ctx.fillText('上限 ' + fmt(cap) + ' · 倍增 ×' + (s.run.multK - 1), T.PX + 120, T.PY + 22);
+  ctx.fillText('发射上限 ' + fmt(cap) + ' · 倍增 ×' + (s.run.multK - 1), T.PX + 120, T.PY + 22);
   const gw = T.PW - 130;
   ctx.fillStyle = '#22222a';
   ctx.fillRect(T.PX + 120, T.PY + 30, gw, 6);
   ctx.fillStyle = '#d64545';
-  ctx.fillRect(T.PX + 120, T.PY + 30, gw * Math.min(1, s.run.sinceFire / T.fireGuarantee), 6);
+  ctx.fillRect(T.PX + 120, T.PY + 30, gw * Math.min(1, s.run.ammo / cap), 6);
   ctx.fillStyle = '#777';
   ctx.font = '10px "Microsoft YaHei",sans-serif';
-  ctx.fillText('发射保底', T.PX + 120, T.PY + 48);
+  ctx.fillText('蓄满自动发射', T.PX + 120, T.PY + 48);
   if (s.lastSalvo) {
     ctx.globalAlpha = Math.min(1, s.lastSalvo.t);
     ctx.fillStyle = '#ff8a8a';

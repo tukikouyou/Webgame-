@@ -2,7 +2,7 @@
 import { T } from '../config/tuning';
 import type { GameState } from './types';
 import { ensureColumns, updateFront, updateBoss, crushStep, incomePerSec } from './field';
-import { updatePlinko, doFire } from './plinko';
+import { updatePlinko } from './plinko';
 import { emitMarbles, updateMarbles, updateEnemies, spawnEnemy } from './marbles';
 import { autoBuy } from './economy';
 import { canRebirth, doRebirth } from './prestige';
@@ -16,8 +16,6 @@ export function step(s: GameState, h: number): void {
   ensureColumns(s);
 
   updatePlinko(s, h);
-  r.sinceFire += h;
-  if (r.sinceFire >= T.fireGuarantee) doFire(s);
 
   emitMarbles(s, h);
   updateMarbles(s, h);

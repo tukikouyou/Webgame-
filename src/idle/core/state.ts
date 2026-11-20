@@ -9,7 +9,7 @@ export function freshRun(): RunState {
   return {
     coins: 0,
     up: { dmg: 0, cap: 0, base: 0 },
-    ammo: 0, multK: 1, sinceFire: 0, capBinding: false,
+    ammo: 0, multK: 1, capBinding: false,
     queue: 0, perMarble: 1, emitAcc: 0,
     firedAcc: 0, ammoRate: 0,
     colBase: 0, cols: [],

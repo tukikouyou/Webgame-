@@ -71,7 +71,7 @@ export function doLegacy(s: GameState): void {
 
 export interface TalentDef { id: 'vault' | 'res' | 'coin' | 'startPegs'; name: string; desc: string; }
 export const TALENTS: TalentDef[] = [
-  { id: 'vault', name: '解锁「弹药库」', desc: '卡池加入弹药库(弹药上限 ×2)' },
+  { id: 'vault', name: '解锁「弹药库」', desc: '卡池加入弹药库(发射上限 ×2)' },
   { id: 'res', name: '解锁「能量共鸣」', desc: '卡池加入能量共鸣(维度能量 ×1.3)' },
   { id: 'coin', name: '金币天赋', desc: '金币收入 ×1.5 / 级' },
   { id: 'startPegs', name: '起步钉子', desc: '每个纪元开局自带 2 颗 1 级钉子' },

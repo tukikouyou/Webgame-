@@ -1,4 +1,4 @@
-/* 钉板:落球物理(照搬原作)、特殊钉加弹药、落槽效果(空槽/倍增/发射)与发射保底。 */
+/* 钉板:落球物理(照搬原作)、特殊钉加弹药、落槽效果(空槽/倍增/发射),蓄力达到发射上限时自动发射。 */
 import { T } from '../config/tuning';
 import type { GameState, Ball, SlotKind } from './types';
 import { addSalvo } from './marbles';
@@ -105,6 +105,7 @@ export function updatePlinko(s: GameState, h: number): void {
       Object.assign(b, newBall(s));
     }
   }
+  if (s.run.ammo >= capValue(s)) doFire(s);   // 蓄满发射上限 → 自动发射
 }
 
 function slotEffect(s: GameState, kind: SlotKind): void {
@@ -114,15 +115,14 @@ function slotEffect(s: GameState, kind: SlotKind): void {
   else doFire(s);
 }
 
-/* 发射:min(弹药, 上限) 进入待发;超出部分留作下一轮起始弹药(最多等于上限) */
+/* 发射:min(弹药, 发射上限) 进入待发;超出部分留作下一轮起始弹药(最多等于上限) */
 export function doFire(s: GameState): void {
   const r = s.run;
   const cap = capValue(s);
   const amount = Math.min(r.ammo, cap);
   const carry = Math.min(r.ammo - amount, cap);
-  r.capBinding = r.ammo > cap;
+  r.capBinding = r.ammo >= cap;
   if (amount > 0) addSalvo(s, amount);
   r.ammo = carry;
   r.multK = 1;
-  r.sinceFire = 0;
 }

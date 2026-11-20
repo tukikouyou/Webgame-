@@ -10,7 +10,7 @@ export const CARDS: CardDef[] = [
   { id: 'mulSlot',   name: '倍增槽卡', color: '#5aa9ff', desc: '送 1 格倍增(不占解锁宽度);倍增系数 +0.25' },
   { id: 'fireSlot',  name: '发射槽卡', color: '#ff6b6b', desc: '送 1 格发射(不占解锁宽度);齐射伤害 ×1.2' },
   { id: 'coinPact',  name: '金币契约', color: '#ffd24a', desc: '金币收入 ×1.5' },
-  { id: 'ammoVault', name: '弹药库',   color: '#b98cff', desc: '弹药上限 ×2', lock: 'vault' },
+  { id: 'ammoVault', name: '弹药库',   color: '#b98cff', desc: '发射上限 ×2', lock: 'vault' },
   { id: 'energyRes', name: '能量共鸣', color: '#4de0c0', desc: '维度能量 ×1.3', lock: 'res' },
 ];
 
