@@ -31,6 +31,7 @@ export const T = {
   bossFireBase: 0.5,           // 前线在第 1 区时 boss 每秒发射数
   bossFireStep: 0.5,           // 前线每推进一个普通区,每秒多发这么多
   bossFire: 7,                 // 前线进入 boss 区后 boss 每秒发射数
+  bossFullFireDim: 6,          // 从第几维起 boss 整个维度都按 boss 区火力发射(不再按区递增)
   enemyDmgMul: 1,              // 敌方弹珠威力 = 所在区格子满血 × 此值(飞进哪个区就按哪个区算)
   enemySpeed: 150, enemyCap: 300,
   // boss 钉板:从第 bossBoardDim 维起,boss 也有一块钉板,齐射叠加在常规火力上
@@ -95,6 +96,7 @@ export const TUNABLE: [keyof Tuning, string][] = [
   ['bossFire', 'boss 区发射(颗/秒)'],
   ['bossBoardDim', 'boss 钉板起始维度'],
   ['fullContestDim', '取消巩固区起始维度'],
+  ['bossFullFireDim', 'boss 全程满火力起始维度'],
   ['bossBoardBalls', 'boss 钉板球数'],
   ['bossSalvoCap', 'boss 齐射上限(颗)'],
   ['bossRegen', 'boss 每秒回血比例'],

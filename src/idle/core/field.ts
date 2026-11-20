@@ -138,9 +138,11 @@ export function updateBoss(s: GameState, h: number, spawnEnemy: (x: number, y: n
     b.shieldBroken = true;
     toast(s, '🛡 boss 护盾破除!', '#ffffff');
   }
-  // 从每一维开局就开火,发射数随前线所在的区递增;前线进入 boss 区后用 boss 区火力
+  // 从每一维开局就开火,发射数随前线所在的区递增;前线进入 boss 区后用 boss 区火力。
+  // 第 bossFullFireDim 维起不再递增,整个维度都用 boss 区火力
   const region = colInfo(Math.min(r.front, r.fieldEnd - 1)).region;
-  const rate = r.front >= start ? T.bossFire : T.bossFireBase + T.bossFireStep * (region - 1);
+  const full = r.front >= start || b.dim >= T.bossFullFireDim;
+  const rate = full ? T.bossFire : T.bossFireBase + T.bossFireStep * (region - 1);
   b.fireAcc += rate * h;
   while (b.fireAcc >= 1) {
     b.fireAcc -= 1;
