@@ -91,10 +91,14 @@ function awardRegions(s: GameState): void {
   }
 }
 
-/* 前线后方超过争夺区的列 → 巩固:残留敌格投降,收入并入累计值,不再存格子 */
+/* 前线后方超过争夺区的列 → 巩固:残留敌格投降,收入并入累计值,不再存格子。
+   第 fullContestDim 维起没有巩固区:只巩固到当前维的起点,整个维度都可以被 boss 抢回 */
 function consolidate(s: GameState): void {
   const r = s.run;
-  while (r.front - r.colBase > T.bandCols && r.cols.length) {
+  let limit = r.front - T.bandCols;
+  const info = colInfo(Math.min(r.front, r.fieldEnd - 1));
+  if (info.dim >= T.fullContestDim) limit = Math.min(limit, (info.dim - 1) * colsPerDim());
+  while (r.colBase < limit && r.cols.length) {
     const c = r.colBase;
     const col = r.cols.shift()!;
     for (let k = 0; k < T.rows; k++) if (col.o[k] !== 0) capture(s, c, k, col);

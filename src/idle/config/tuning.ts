@@ -14,6 +14,7 @@ export const T = {
   rows: 13, cellPx: 12,
   regionCols: 40, regionsPerDim: 3,   // 每维 3 个普通区 + 1 个 boss 区
   bandCols: 20,                // 前线后方多少列以内仍可被反推(争夺区)
+  fullContestDim: 6,           // 从第几维起取消巩固区:整个维度都可以被 boss 抢回
   frontRatio: 0.9,             // 一列我方占比 ≥ 90% 才算推过
   cannonBehind: 25,            // 炮台在前线后方多少列
   lookahead: 70,               // 前线前方预生成多少列
@@ -93,6 +94,7 @@ export const TUNABLE: [keyof Tuning, string][] = [
   ['bossFireStep', 'boss 每区多发(颗/秒)'],
   ['bossFire', 'boss 区发射(颗/秒)'],
   ['bossBoardDim', 'boss 钉板起始维度'],
+  ['fullContestDim', '取消巩固区起始维度'],
   ['bossBoardBalls', 'boss 钉板球数'],
   ['bossSalvoCap', 'boss 齐射上限(颗)'],
   ['bossRegen', 'boss 每秒回血比例'],
