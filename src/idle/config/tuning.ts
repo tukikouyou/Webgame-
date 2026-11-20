@@ -25,9 +25,9 @@ export const T = {
   dimExtra: 1,                 // 每升一维额外再 ×此值
   bossCellMul: 5,              // boss 区格子血量倍率
   bossHpRatio: 2,              // boss 本体血量 = boss 区格子总血量 × 此值 × bossHpDimMul^(维度−1)
-  bossHpDimMul: 1.1,           // boss 本体血量每维额外倍率(破盾后靠回血再卡一下,越往后越硬)
+  bossHpDimMul: 1,             // boss 本体血量每维额外倍率
   bossShieldRatio: 0.1,        // boss 区敌格占比 ≤ 此值时护盾破除
-  bossRegen: 0.02,             // boss 每秒回复最大血量的比例
+  bossRegen: 0.01,             // boss 每秒回复最大血量的比例(破盾后的回血当作第二阶段:拖慢击杀,但一般不至于打不动)
   bossCircleHit: 0,            // 0 = 普通 boss:弹珠打到 boss 区末端墙就算命中;1 = 圆形碰撞(以后做成特殊 boss 的特性)
   // 敌方弹珠全部由 boss 发射,每一维开局就开火
   bossFireBase: 1,             // 前线在第 1 区时 boss 每秒发射数
