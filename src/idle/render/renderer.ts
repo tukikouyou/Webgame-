@@ -174,14 +174,19 @@ function drawHud(ctx: CanvasRenderingContext2D, s: GameState): void {
     ctx.fillStyle = '#ccc';
     ctx.font = 'bold 14px "Microsoft YaHei",sans-serif';
     ctx.fillText(b.dim + ' 维 BOSS  ·  ' + (b.shieldBroken ? '护盾已破' : '护盾中(敌格 ≤ ' + Math.round(T.bossShieldRatio * 100) + '% 破盾)'), bx, by);
-    ctx.fillStyle = '#22222a'; ctx.fillRect(bx, by + 8, bw, 10);
-    ctx.fillStyle = '#2b6cd4'; ctx.fillRect(bx, by + 8, bw * b.p, 10);
-    ctx.fillStyle = '#888'; ctx.font = '11px sans-serif';
-    ctx.fillText('占领 ' + Math.round(b.p * 100) + '%', bx + bw + 8, by + 17);
-    ctx.fillStyle = '#22222a'; ctx.fillRect(bx, by + 24, bw, 10);
-    ctx.fillStyle = '#eeeeee'; ctx.fillRect(bx, by + 24, bw * Math.max(0, b.hp / b.hpMax), 10);
+    ctx.font = '11px sans-serif';
+    let hy = by + 8;
+    if (!b.shieldBroken) {   // 占领进度只在破盾前有意义,破盾后隐藏
+      ctx.fillStyle = '#22222a'; ctx.fillRect(bx, hy, bw, 10);
+      ctx.fillStyle = '#2b6cd4'; ctx.fillRect(bx, hy, bw * b.p, 10);
+      ctx.fillStyle = '#888';
+      ctx.fillText('占领 ' + Math.round(b.p * 100) + '%', bx + bw + 8, hy + 9);
+      hy += 16;
+    }
+    ctx.fillStyle = '#22222a'; ctx.fillRect(bx, hy, bw, 10);
+    ctx.fillStyle = '#eeeeee'; ctx.fillRect(bx, hy, bw * Math.max(0, b.hp / b.hpMax), 10);
     ctx.fillStyle = '#888';
-    ctx.fillText('HP ' + fmt(Math.max(0, b.hp)) + ' / ' + fmt(b.hpMax) + ' · 回血 ' + fmt(T.bossRegen * b.hpMax) + '/秒', bx + bw + 8, by + 33);
+    ctx.fillText('HP ' + fmt(Math.max(0, b.hp)) + ' / ' + fmt(b.hpMax) + ' · 回血 ' + fmt(T.bossRegen * b.hpMax) + '/秒', bx + bw + 8, hy + 9);
   }
 }
 
