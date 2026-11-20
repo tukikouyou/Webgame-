@@ -2,7 +2,7 @@
 import { T } from '../config/tuning';
 import type { GameState } from '../core/types';
 import { PEGS, SPECIAL, PEG_COLORS, computeLayout } from '../core/plinko';
-import { getCol, genEnd, crushRatio, bossRegionStart } from '../core/field';
+import { getCol, genEnd, bossRegionStart } from '../core/field';
 import { colInfo, cellHp, regionLabel } from '../core/grid';
 import { MR, BOSS_R, SHIELD_R, cannonX, fieldHeightPx } from '../core/marbles';
 import { fmt, fmtTime } from '../core/format';
@@ -140,11 +140,6 @@ function drawHud(ctx: CanvasRenderingContext2D, s: GameState): void {
   ctx.fillStyle = '#ffffff';
   ctx.font = 'bold 34px "Microsoft YaHei",sans-serif';
   ctx.fillText(frontLabel(s).replace('-', ' 维 · ').replace(/ · (\d+)$/, ' · 第 $1 区').replace('BOSS', 'BOSS 关'), x0, y0 + 14);
-  if (r.crushing) {
-    ctx.fillStyle = '#ffd24a';
-    ctx.font = 'bold 18px "Microsoft YaHei",sans-serif';
-    ctx.fillText('⚡ 碾压中', x0 + 360, y0 + 10);
-  }
 
   const col = (label: string, val: string, sub: string, x: number, y: number, color: string) => {
     ctx.fillStyle = '#888';
@@ -168,8 +163,7 @@ function drawHud(ctx: CanvasRenderingContext2D, s: GameState): void {
   const y2 = 150;
   col('转生可得', gain >= 1 ? '+' + fmt(gain) + ' 能量' : '—', '最远纪录 ' + fmtTime(r.sinceRecord) + ' 未刷新', x0, y2, gain >= 1 ? '#7fd0ff' : '#555');
   col('前线速度', fmt(Math.max(0, r.frontSpeed)) + ' 列/分', '本轮 ' + fmtTime(r.time), x0 + 200, y2, '#ffffff');
-  const ratio = crushRatio(s);
-  col('火力/所需', ratio >= 100 ? fmt(ratio) : ratio.toFixed(2), '≥ ' + T.crushRatio + ' 进入碾压', x0 + 360, y2, ratio >= T.crushRatio ? '#ffd24a' : '#ffffff');
+  col('前线格子血量', fmt(cellHp(r.front)), '每区 ×' + T.g + ',boss 区 ×' + T.bossCellMul, x0 + 360, y2, '#ff9a8a');
   col('本纪元最高', s.epoch.maxDim + ' 维', canLegacy(s) ? '可以传承!' : canEndEpoch(s) ? '可以终结纪元' : '终结需 ' + T.epochDim + ' 维', x0 + 560, y2, canEndEpoch(s) ? '#ffb0f0' : '#ffffff');
   col('待发弹药', fmt(r.queue), '自动化' + (autoUnlocked(s) ? '已解锁' : '到 ' + T.autoUnlockDim + ' 维解锁'), x0 + 720, y2, '#ff8a8a');
 

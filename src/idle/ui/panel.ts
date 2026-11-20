@@ -15,7 +15,6 @@ import {
   canLegacy, legacyGain, doLegacy, TALENTS, talentCost, buyTalent,
 } from '../core/prestige';
 import { autoUnlocked } from '../core/step';
-import { crushRatio } from '../core/field';
 
 export interface PanelApp {
   state: GameState;
@@ -69,7 +68,7 @@ export function initPanel(app: PanelApp): void {
     const gain = rebirthGain(s);
     let h = '<div class="row big">转生可得 <b class="cE">+' + fmt(gain) + '</b> 维度能量(当前 ' + fmt(s.epoch.energy) + ')'
       + btn('rebirth', '转生(回到 1 维 1 区)', canRebirth(s), 'warn') + '</div>';
-    h += '<p class="dim">推得越远能量越多(每区 ×' + T.energyRegionMul + ',每维 ×' + T.energyDimMul + ');boss 区按占领比例计入,击败 boss 额外奖励。金币和炮台升级清零,钉子、槽宽、卡牌保留。</p>';
+    h += '<p class="dim">推得越远能量越多(每推进一区价值 ×' + T.energyRegionMul + ',跨维度连续);boss 区按占领比例计入,击败 boss 额外奖励。金币和炮台升级清零,钉子、槽宽、卡牌保留。</p>';
     if (autoUnlocked(s)) {
       h += '<div class="row">' + btn('toggle:autoRebirth', '自动转生:' + (s.settings.autoRebirth ? '开' : '关'), true, s.settings.autoRebirth ? 'on' : '') + ' <span class="dim">最远纪录 ' + T.autoRebirthSec + ' 秒没刷新时自动转生(秒数可在调试页改)</span></div>';
     } else h += '<p class="dim">自动转生:到达 ' + T.autoUnlockDim + ' 维后解锁</p>';
@@ -153,7 +152,7 @@ export function initPanel(app: PanelApp): void {
     if (!el) return;
     const s = app.state;
     el.innerHTML = '本轮用时 ' + fmtTime(s.run.time) + ' · 前线列 ' + s.run.front + ' · 场上弹珠 ' + s.marbles.length + ' / 敌方 ' + s.enemies.length
-      + ' · 火力/所需 ' + crushRatio(s).toFixed(2) + ' · 齐射速率 ' + fmt(s.run.ammoRate) + '/秒 · 能量倍率 ×' + energyMul(s).toFixed(2)
+      + ' · 齐射速率 ' + fmt(s.run.ammoRate) + '/秒 · 能量倍率 ×' + energyMul(s).toFixed(2)
       + ' · 本纪元转生 ' + s.epoch.runs + ' 次 · 已终结纪元 ' + s.cycle.epochs + ' 次';
   }
 

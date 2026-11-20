@@ -1,4 +1,5 @@
 /* 战场几何:全局列号 → 维度/区号,以及格子血量和区域价值。无状态纯函数。
+   血量和能量价值都按「全局第几区」连续增长:boss 区是一个尖峰(×bossCellMul),下一维第 1 区接着往上涨。
    一轮的战场是连续的:1 维 1 区 → … → 1 维 boss 区 → 2 维 1 区 → …;列号 < 0 是开局领土。 */
 import { T } from '../config/tuning';
 
@@ -23,12 +24,17 @@ export function colInfo(c: number): ColInfo {
 export function cellHp(c: number): number {
   if (c < 0) return 1;
   const i = colInfo(c);
-  return Math.pow(T.g, i.region - 1) * Math.pow(T.h, i.dim - 1) * (i.isBoss ? T.bossCellMul : 1);
+  return Math.pow(T.g, regionIndex(i.dim, i.region)) * Math.pow(T.dimExtra, i.dim - 1) * (i.isBoss ? T.bossCellMul : 1);
 }
 
 /* D 维第 r 区的转生能量价值(boss 区 r = 区数+1) */
 export function regionValue(dim: number, region: number): number {
-  return T.energyBase * Math.pow(T.energyDimMul, dim - 1) * Math.pow(T.energyRegionMul, region - 1);
+  return T.energyBase * Math.pow(T.energyRegionMul, regionIndex(dim, region)) * Math.pow(T.energyDimMul, dim - 1);
+}
+
+/* 全局第几区(从 0 开始);D 维 boss 区与 D+1 维第 1 区同级 */
+export function regionIndex(dim: number, region: number): number {
+  return (dim - 1) * T.regionsPerDim + (region - 1);
 }
 
 export function regionLabel(dim: number, region: number): string {

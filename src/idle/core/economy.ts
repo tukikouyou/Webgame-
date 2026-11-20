@@ -37,12 +37,11 @@ export function buyUp(s: GameState, kind: UpKind): boolean {
   return true;
 }
 
-/* 自动升级:反复买「买得起的最便宜项目」;发射上限只在最近一次齐射是蓄满触发时才买 */
+/* 自动升级:反复买「买得起的最便宜项目」 */
 export function autoBuy(s: GameState): void {
   for (let n = 0; n < 60; n++) {
     let best: UpKind | null = null, bestCost = Infinity;
     for (const k of UP_KINDS) {
-      if (k === 'cap' && !s.run.capBinding) continue;
       const c = upCost(k, s.run.up[k]);
       if (c < bestCost) { bestCost = c; best = k; }
     }

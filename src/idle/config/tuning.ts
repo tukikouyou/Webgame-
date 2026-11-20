@@ -20,8 +20,8 @@ export const T = {
   homeCols: 3,                 // 开局自带的领土列数
 
   // ---- 敌方 ----
-  g: 4,                        // 同一维度内每区格子血量 ×g
-  h: 5.3,                      // 每升一维格子血量 ×h
+  g: 4,                        // 每推进一区格子血量 ×g(跨维度连续:2-1 接着 1 维 boss 之后继续涨)
+  dimExtra: 1,                 // 每升一维额外再 ×此值
   bossCellMul: 5,              // boss 区格子血量倍率
   bossHpRatio: 0.5,            // boss 本体血量 = boss 区格子总血量 × 此值
   bossShieldRatio: 0.1,        // boss 区敌格占比 ≤ 此值时护盾破除
@@ -54,13 +54,13 @@ export const T = {
 
   // ---- 维度能量(转生) ----
   energyBase: 4,               // 区域能量价值的整体倍率
-  energyDimMul: 1.5, energyRegionMul: 1.6, energyBossKill: 10,
+  energyRegionMul: 1.6,        // 每推进一区能量价值 ×此值(跨维度连续)
+  energyDimMul: 1,             // 每升一维能量价值额外 ×此值
+  energyBossKill: 10,          // 击败 boss 额外奖励 = 该维第 1 区价值 × 此值
   pegCost0: 2, pegCostMul: 1.6, pegUpCost0: 3, pegUpCostMul: 1.5,
   widthCost0: 5, widthCostMul: 1.4,
 
-  // ---- 碾压 / 自动化 ----
-  crushRatio: 10,              // 估算火力 ≥ 所需火力 × 此值 → 碾压
-  crushMaxCols: 40,            // 碾压最快每秒推进列数
+  // ---- 自动化 ----
   autoRebirthSec: 90,          // 自动转生:最远纪录多少秒没刷新
   autoUnlockDim: 2,            // 到达几维解锁自动升级/自动转生
 
@@ -75,7 +75,7 @@ export type Tuning = typeof T;
 /* 调试页可以实时调整的参数 */
 export const TUNABLE: [keyof Tuning, string][] = [
   ['g', '每区敌方血量倍率 g'],
-  ['h', '每维敌方血量倍率 h'],
+  ['dimExtra', '每维额外血量倍率'],
   ['bossCellMul', 'boss 区格子倍率'],
   ['bossHpRatio', 'boss 本体血量比例'],
   ['pushNormal', '普通区反推(弹珠/秒)'],
@@ -93,7 +93,6 @@ export const TUNABLE: [keyof Tuning, string][] = [
   ['incomeRate', '格子每秒产出比例'],
   ['energyBase', '区域能量基数'],
   ['energyRegionMul', '能量每区倍率'],
-  ['crushRatio', '碾压阈值'],
   ['autoRebirthSec', '自动转生秒数'],
   ['epochDim', '终结纪元所需维度'],
   ['legacyDim', '传承所需维度'],

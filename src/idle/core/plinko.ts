@@ -122,7 +122,6 @@ export function doFire(s: GameState): void {
   const cap = capValue(s);
   const amount = Math.min(r.ammo, cap);
   const carry = Math.min(r.ammo - amount, cap);
-  r.capBinding = r.ammo >= cap;
   if (amount > 0) addSalvo(s, amount);
   r.ammo = carry;
   r.multK = 1;

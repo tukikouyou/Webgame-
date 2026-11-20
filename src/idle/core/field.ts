@@ -1,8 +1,8 @@
-/* 战场:列的生成与巩固、前线计算、区域能量结算、boss、碾压、金币收入。 */
+/* 战场:列的生成与巩固、前线计算、区域能量结算、boss、金币收入。 */
 import { T } from '../config/tuning';
 import type { GameState, Column } from './types';
 import { colInfo, cellHp, colsPerDim, regionValue, bossRegionNo } from './grid';
-import { coinMul, dmgValue, salvoMul } from './economy';
+import { coinMul } from './economy';
 import { toast, bigFlash } from './fx';
 
 export function getCol(s: GameState, c: number): Column | null {
@@ -150,41 +150,16 @@ function killBoss(s: GameState): void {
     const col = getCol(s, c);
     if (col) for (let k = 0; k < T.rows; k++) if (col.o[k] !== 0) capture(s, c, k, col);
   }
-  r.clearedValue += regionValue(b.dim, bossRegionNo()) + T.energyBase * T.energyBossKill * Math.pow(T.energyDimMul, b.dim - 1);
+  r.clearedValue += regionValue(b.dim, bossRegionNo()) + T.energyBossKill * regionValue(b.dim, 1);
   r.fieldEnd = (b.dim + 1) * colsPerDim();
   const nd = b.dim + 1;
   r.boss = null;
+  s.marbles = [];          // 打过 boss 清场
+  s.enemies = [];
   if (nd > s.epoch.maxDim) { s.epoch.maxDim = nd; s.epoch.maxRegionAtMax = 1; }
   if (nd > s.legacy.everDim) s.legacy.everDim = nd;
   bigFlash(s, '升维 → ' + nd + ' 维');
   toast(s, '击败 ' + b.dim + ' 维 boss!进入 ' + nd + ' 维', '#ffffff');
-}
-
-/* ---- 碾压:估算火力远超当前列所需时,整列横扫 ---- */
-export function crushRatio(s: GameState): number {
-  const need = T.rows * cellHp(s.run.front);
-  const dps = s.run.ammoRate * dmgValue(s) * salvoMul(s);
-  return dps / need;
-}
-
-export function crushStep(s: GameState, h: number): void {
-  const r = s.run;
-  const ratio = crushRatio(s);
-  r.crushing = ratio >= T.crushRatio && r.front < r.fieldEnd;
-  if (!r.crushing) { r.crushAcc = 0; return; }
-  r.crushAcc += Math.min(T.crushMaxCols, ratio) * h;
-  while (r.crushAcc >= 1 && r.front < genEnd(s)) {
-    r.crushAcc -= 1;
-    const c = r.front;
-    const col = getCol(s, c);
-    if (!col) break;
-    for (let k = 0; k < T.rows; k++) if (col.o[k] !== 0) capture(s, c, k, col);
-    r.front++;
-  }
-  const b = r.boss;
-  if (b && b.alive && b.shieldBroken && r.front >= bossRegionStart(s)) {
-    damageBoss(s, r.ammoRate * dmgValue(s) * salvoMul(s) * h);
-  }
 }
 
 /* ---- 金币收入(每秒,已乘倍率) ---- */

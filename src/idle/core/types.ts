@@ -22,7 +22,6 @@ export interface RunState {
   up: Record<UpKind, number>;
   // 钉板蓄力
   ammo: number; multK: number;
-  capBinding: boolean;                  // 上一次齐射是否是蓄满发射上限触发的
   // 待发射
   queue: number; perMarble: number; emitAcc: number;
   firedAcc: number; ammoRate: number;   // 齐射弹药速率(指数平均),用于估算火力
@@ -33,7 +32,7 @@ export interface RunState {
   fieldEnd: number;                     // 尚未击败的 boss 区末尾,之后的列不存在
   boss: Boss | null;
   clearedValue: number; awardedRegion: number;   // 转生能量累计
-  pushAcc: number; crushAcc: number; crushing: boolean;
+  pushAcc: number;
   frontSpeed: number; speedAcc: number; speedPrevFront: number;
 }
 

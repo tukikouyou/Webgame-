@@ -9,7 +9,7 @@ export function freshRun(): RunState {
   return {
     coins: 0,
     up: { dmg: 0, cap: 0, base: 0 },
-    ammo: 0, multK: 1, capBinding: false,
+    ammo: 0, multK: 1,
     queue: 0, perMarble: 1, emitAcc: 0,
     firedAcc: 0, ammoRate: 0,
     colBase: 0, cols: [],
@@ -18,7 +18,7 @@ export function freshRun(): RunState {
     fieldEnd: colsPerDim(),
     boss: null,
     clearedValue: 0, awardedRegion: 0,
-    pushAcc: 0, crushAcc: 0, crushing: false,
+    pushAcc: 0,
     frontSpeed: 0, speedAcc: 0, speedPrevFront: 0,
   };
 }

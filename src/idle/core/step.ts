@@ -1,7 +1,7 @@
 /* 单帧总编排:按固定顺序推进所有逻辑。 */
 import { T } from '../config/tuning';
 import type { GameState } from './types';
-import { ensureColumns, updateFront, updateBoss, crushStep, incomePerSec } from './field';
+import { ensureColumns, updateFront, updateBoss, incomePerSec } from './field';
 import { updatePlinko } from './plinko';
 import { emitMarbles, updateMarbles, updateEnemies, spawnEnemy } from './marbles';
 import { autoBuy } from './economy';
@@ -21,7 +21,6 @@ export function step(s: GameState, h: number): void {
   updateMarbles(s, h);
   updateEnemies(s, h);
   updateBoss(s, h, (x, y, dmg) => spawnEnemy(s, x, y, dmg));
-  crushStep(s, h);
   updateFront(s, h);
   ensureColumns(s);
 

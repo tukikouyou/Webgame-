@@ -1,7 +1,8 @@
 /* localStorage 存档:只存四层成长和设置,不存球/弹珠/特效等瞬时对象。 */
 import type { GameState } from '../core/types';
 
-const KEY = 'marble-idle-demo-v1';
+/* 地址带 ?sim 时用独立存档(跑数值模拟用,不碰正常存档) */
+const KEY = 'marble-idle-demo-v1' + (new URLSearchParams(location.search).has('sim') ? '-sim' : '');
 
 export function saveGame(s: GameState): void {
   const data = {
