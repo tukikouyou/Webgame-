@@ -1,6 +1,5 @@
 /* 战场几何:全局列号 → 维度/区号,以及格子血量和区域价值。无状态纯函数。
-   格子血量:维内每区 ×g,boss 区再 ×bossCellMul;下一维第 1 区 = 上一维 boss 区 × newDimRatio(略低于 boss,第 2 区起就比 boss 难)。
-   能量价值按「全局第几区」连续增长。
+   血量和能量价值都按「全局第几区」连续增长:boss 区是一个尖峰(×bossCellMul),下一维第 1 区接着往上涨。
    一轮的战场是连续的:1 维 1 区 → … → 1 维 boss 区 → 2 维 1 区 → …;列号 < 0 是开局领土。 */
 import { T } from '../config/tuning';
 
@@ -25,13 +24,14 @@ export function colInfo(c: number): ColInfo {
 export function cellHp(c: number): number {
   if (c < 0) return 1;
   const i = colInfo(c);
-  return dimBaseHp(i.dim) * Math.pow(T.g, i.region - 1) * (i.isBoss ? T.bossCellMul : 1);
+  // 2 维起,前两区按上一维 boss 区的比例(第 1 区略低于 boss,第 2 区略高);第 3 区和 boss 区照原曲线
+  if (i.dim > 1 && i.region <= 2) return (i.region === 1 ? T.dimR1Ratio : T.dimR2Ratio) * curveHp(i.dim - 1, bossRegionNo());
+  return curveHp(i.dim, i.region);
 }
 
-/* D 维第 1 区的格子血量 */
-export function dimBaseHp(dim: number): number {
-  const perDim = T.newDimRatio * Math.pow(T.g, T.regionsPerDim) * T.bossCellMul * T.dimExtra;
-  return Math.pow(perDim, dim - 1);
+/* 原连续曲线:每区 ×g,boss 区再 ×bossCellMul */
+function curveHp(dim: number, region: number): number {
+  return Math.pow(T.g, regionIndex(dim, region)) * Math.pow(T.dimExtra, dim - 1) * (region === bossRegionNo() ? T.bossCellMul : 1);
 }
 
 /* D 维第 r 区的转生能量价值(boss 区 r = 区数+1) */
