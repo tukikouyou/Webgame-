@@ -181,7 +181,7 @@ function drawHud(ctx: CanvasRenderingContext2D, s: GameState): void {
     ctx.fillStyle = '#22222a'; ctx.fillRect(bx, by + 24, bw, 10);
     ctx.fillStyle = '#eeeeee'; ctx.fillRect(bx, by + 24, bw * Math.max(0, b.hp / b.hpMax), 10);
     ctx.fillStyle = '#888';
-    ctx.fillText('HP ' + fmt(Math.max(0, b.hp)) + ' / ' + fmt(b.hpMax), bx + bw + 8, by + 33);
+    ctx.fillText('HP ' + fmt(Math.max(0, b.hp)) + ' / ' + fmt(b.hpMax) + ' · 回血 ' + fmt(T.bossRegen * b.hpMax) + '/秒', bx + bw + 8, by + 33);
   }
 }
 

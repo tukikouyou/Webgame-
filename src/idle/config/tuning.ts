@@ -25,6 +25,7 @@ export const T = {
   bossCellMul: 5,              // boss 区格子血量倍率
   bossHpRatio: 0.5,            // boss 本体血量 = boss 区格子总血量 × 此值
   bossShieldRatio: 0.1,        // boss 区敌格占比 ≤ 此值时护盾破除
+  bossRegen: 0.02,             // boss 每秒回复最大血量的比例
   pushNormal: 0.3,             // 普通区敌方反推弹珠/秒
   pushBoss: 5,                 // boss 区敌方反推弹珠/秒
   bossFire: 2,                 // boss 本体弹珠/秒
@@ -83,6 +84,7 @@ export const TUNABLE: [keyof Tuning, string][] = [
   ['pushNormal', '普通区反推(弹珠/秒)'],
   ['pushBoss', 'boss 区反推(弹珠/秒)'],
   ['bossFire', 'boss 开火(弹珠/秒)'],
+  ['bossRegen', 'boss 每秒回血比例'],
   ['dmgMul', '伤害每级倍率'],
   ['dmgCostMul', '伤害价格每级倍率'],
   ['capBase', '发射上限初始值'],

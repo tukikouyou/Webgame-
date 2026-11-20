@@ -109,6 +109,7 @@ export function updateBoss(s: GameState, h: number, spawnEnemy: (x: number, y: n
   }
   const total = T.regionCols * T.rows;
   b.p = 1 - enemy / total;
+  b.hp = Math.min(b.hpMax, b.hp + T.bossRegen * b.hpMax * h);
   // boss 战里前线不动,但占领比例上升或血量下降也算有进展(避免误判撞墙)
   const hpFrac = b.hp / b.hpMax;
   if (b.p > b.bestP + 0.01 || hpFrac < b.bestHp - 0.01) {
