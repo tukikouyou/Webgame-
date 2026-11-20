@@ -21,7 +21,8 @@ export const T = {
   homeCols: 3,                 // 开局自带的领土列数
 
   // ---- 敌方 ----
-  g: 4,                        // 每推进一区格子血量 ×g(跨维度连续:2-1 接着 1 维 boss 之后继续涨)
+  g: 2.5,                      // 维内每推进一区格子血量 ×g(每维整体 ×newDimRatio×g³×bossCellMul ≈ 70)
+  newDimRatio: 0.9,            // 新维度第 1 区格子血量 = 上一维 boss 区 × 此值(第 2 区起就比 boss 难)
   dimExtra: 1,                 // 每升一维额外再 ×此值
   bossCellMul: 5,              // boss 区格子血量倍率
   bossHpRatio: 2,              // boss 本体血量 = boss 区格子总血量 × 此值 × bossHpDimMul^(维度−1)
@@ -91,6 +92,7 @@ export type Tuning = typeof T;
 /* 调试页可以实时调整的参数 */
 export const TUNABLE: [keyof Tuning, string][] = [
   ['g', '每区敌方血量倍率 g'],
+  ['newDimRatio', '新维度第 1 区 / 上一维 boss'],
   ['dimExtra', '每维额外血量倍率'],
   ['bossCellMul', 'boss 区格子倍率'],
   ['bossHpRatio', 'boss 本体血量比例'],
