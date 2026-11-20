@@ -164,7 +164,7 @@ function drawHud(ctx: CanvasRenderingContext2D, s: GameState): void {
   col('转生可得', gain >= 1 ? '+' + fmt(gain) + ' 能量' : '—', '最远纪录 ' + fmtTime(r.sinceRecord) + ' 未刷新', x0, y2, gain >= 1 ? '#7fd0ff' : '#555');
   col('前线速度', fmt(Math.max(0, r.frontSpeed)) + ' 列/分', '本轮 ' + fmtTime(r.time), x0 + 200, y2, '#ffffff');
   col('前线格子血量', fmt(cellHp(r.front)), '每区 ×' + T.g + ',boss 区 ×' + T.bossCellMul, x0 + 360, y2, '#ff9a8a');
-  col('终结纪元', canEndEpoch(s) ? '+' + fmt(sandGain(s)) + ' 星砂' : '本轮需到 ' + T.epochDim + ' 维', canLegacy(s) ? '可以传承!' : '本纪元最高 ' + s.epoch.maxDim + ' 维', x0 + 560, y2, canEndEpoch(s) ? '#ffb0f0' : '#777');
+  col('终结纪元', canEndEpoch(s) ? '+' + fmt(sandGain(s)) + ' 星砂' : '本轮需到 ' + T.epochDim + ' 维', canLegacy(s) ? '可以传承!' : '传承需本轮到 ' + T.legacyDim + ' 维', x0 + 560, y2, canEndEpoch(s) ? '#ffb0f0' : '#777');
   col('待发弹药', fmt(r.queue), '自动化' + (autoUnlocked(s) ? '已解锁' : '到 ' + T.autoUnlockDim + ' 维解锁'), x0 + 720, y2, '#ff8a8a');
 
   // boss 条

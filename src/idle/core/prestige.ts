@@ -40,12 +40,14 @@ export function doRebirth(s: GameState): void {
 /* ---- 终结纪元:条件和星砂都按当前这一轮推到的位置算 ---- */
 export function canEndEpoch(s: GameState): boolean { return frontInfo(s).dim >= T.epochDim; }
 
-/* 星砂:本轮过第 k 维得 sandPerDim × sandDimGrow^(k−1),全部累加(在 5 维时已过 4 维) */
+/* 星砂:按本轮推过的小关(区,boss 区也算一个)累加,第 i 个区得 sandPerRegion × sandRegionGrow^(i−1)。
+   每维 4 个区,在 5-1 时已推过 16 个区。 */
 export function sandGain(s: GameState): number {
-  const passed = frontInfo(s).dim - 1;
-  const r = T.sandDimGrow;
-  const sum = r === 1 ? passed : (Math.pow(r, passed) - 1) / (r - 1);
-  return Math.floor(T.sandPerDim * sum);
+  const i = frontInfo(s);
+  const passed = (i.dim - 1) * (T.regionsPerDim + 1) + (i.region - 1);
+  const q = T.sandRegionGrow;
+  const sum = q === 1 ? passed : (Math.pow(q, passed) - 1) / (q - 1);
+  return Math.floor(T.sandPerRegion * sum);
 }
 
 export function doEndEpoch(s: GameState): void {
@@ -59,9 +61,9 @@ export function doEndEpoch(s: GameState): void {
   bigFlash(s, '纪元终结 · +' + gain + ' 星砂');
 }
 
-/* ---- 传承 ---- */
-export function canLegacy(s: GameState): boolean { return s.epoch.maxDim >= T.legacyDim; }
-export function legacyGain(s: GameState): number { return 1 + Math.max(0, s.epoch.maxDim - T.legacyDim); }
+/* ---- 传承:条件和传承点也按当前这一轮推到的维度算 ---- */
+export function canLegacy(s: GameState): boolean { return frontInfo(s).dim >= T.legacyDim; }
+export function legacyGain(s: GameState): number { return 1 + Math.max(0, frontInfo(s).dim - T.legacyDim); }
 
 export function doLegacy(s: GameState): void {
   if (!canLegacy(s)) return;

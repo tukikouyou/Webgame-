@@ -107,7 +107,7 @@ export function initPanel(app: PanelApp): void {
   function epochTab(s: GameState): string {
     let h = '<div class="row big">本轮已推到 <b>' + frontLabel(s) + '</b>(本轮需到 ' + T.epochDim + ' 维) '
       + btn('endEpoch', canEndEpoch(s) ? '终结纪元 → +' + fmt(sandGain(s)) + ' 星砂' : '终结纪元(未达成)', canEndEpoch(s), 'warn') + '</div>';
-    h += '<p class="dim">终结纪元会重置维度能量、钉子、槽宽和推进进度;保留卡牌、星砂和传承。条件和星砂都按<b>当前这一轮</b>算:过第 1 维得 ' + T.sandPerDim + ',之后每一维比上一维多 ×' + T.sandDimGrow + ',全部累加。</p>';
+    h += '<p class="dim">终结纪元会重置维度能量、钉子、槽宽和推进进度;保留卡牌、星砂和传承。条件和星砂都按<b>当前这一轮</b>算:每推过一个小关(区)加一份,第 1 区 ' + T.sandPerRegion + ',之后每区 ×' + T.sandRegionGrow + ',全部累加。</p>';
     h += '<div class="row big">星砂 <b class="cS">' + fmt(s.cycle.sand) + '</b> '
       + btn('pack', '开卡包(三选一)' + fmt(packCost(s)) + ' 星砂', s.cycle.sand >= packCost(s) && !s.cycle.pendingPick) + '</div>';
     h += '<h4>已有卡牌(重复抽到叠加层数)</h4><div class="cards">';
@@ -122,7 +122,7 @@ export function initPanel(app: PanelApp): void {
 
   function legacyTab(s: GameState): string {
     let h = '<div class="row big">传承点 <b class="cL">' + fmt(s.legacy.points) + '</b> '
-      + btn('legacy', canLegacy(s) ? '进行传承 → +' + fmt(legacyGain(s)) + ' 传承点' : '进行传承(需本纪元推到 ' + T.legacyDim + ' 维)', canLegacy(s), 'warn') + '</div>';
+      + btn('legacy', canLegacy(s) ? '进行传承 → +' + fmt(legacyGain(s)) + ' 传承点' : '进行传承(需本轮推到 ' + T.legacyDim + ' 维)', canLegacy(s), 'warn') + '</div>';
     h += '<p class="dim">传承会重置卡牌、星砂、卡包价格以及以下所有层;保留传承点和天赋。</p><table class="tbl">';
     for (const t of TALENTS) {
       const cost = talentCost(s, t.id);

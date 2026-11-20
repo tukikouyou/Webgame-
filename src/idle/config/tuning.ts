@@ -66,8 +66,8 @@ export const T = {
 
   // ---- 纪元 / 传承 ----
   epochDim: 5,
-  sandPerDim: 2.5,             // 终结纪元:本轮过第 1 维得多少星砂
-  sandDimGrow: 1.5,            // 之后每过一维,这一维的星砂 ×此值(累加)
+  sandPerRegion: 0.5,          // 终结纪元:本轮推过第 1 个区得多少星砂
+  sandRegionGrow: 1.11,        // 之后每个区比上一个区 ×此值(累加;约每维 ×1.5)
   packCost0: 10, packCostMul: 1.25,
   legacyDim: 10,
 };
@@ -97,7 +97,7 @@ export const TUNABLE: [keyof Tuning, string][] = [
   ['energyRegionMul', '能量每区倍率'],
   ['autoRebirthSec', '自动转生秒数'],
   ['epochDim', '终结纪元所需维度'],
-  ['sandPerDim', '第 1 维星砂'],
-  ['sandDimGrow', '每维星砂增长倍率'],
+  ['sandPerRegion', '第 1 区星砂'],
+  ['sandRegionGrow', '每区星砂增长倍率'],
   ['legacyDim', '传承所需维度'],
 ];
