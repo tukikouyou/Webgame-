@@ -150,8 +150,10 @@ function killBoss(s: GameState): void {
   r.fieldEnd = (b.dim + 1) * colsPerDim();
   const nd = b.dim + 1;
   r.boss = null;
-  s.marbles = [];          // 打过 boss 清场
+  s.marbles = [];          // 打过 boss 清场:场上弹珠和还没打完的待发齐射都清掉
   s.enemies = [];
+  r.queue = 0;
+  r.emitAcc = 0;
   if (nd > s.epoch.maxDim) s.epoch.maxDim = nd;
   if (nd > s.legacy.everDim) s.legacy.everDim = nd;
   bigFlash(s, '升维 → ' + nd + ' 维');

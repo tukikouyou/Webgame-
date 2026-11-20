@@ -93,6 +93,7 @@ export function updateMarbles(s: GameState, h: number): void {
       } else if (b.shieldBroken && d2 < BOSS_R * BOSS_R) {
         dead = true; spark(s, m.x, m.y, '#ffffff');
         damageBoss(s, m.dmg);
+        if (!b.alive) return;   // boss 被击杀时已清场,不能再把本帧存活的弹珠写回去
       }
     }
 
