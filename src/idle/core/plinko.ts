@@ -108,11 +108,12 @@ export function updatePlinko(s: GameState, h: number): void {
   if (s.run.ammo >= capValue(s)) doFire(s);   // 蓄满发射上限 → 自动发射
 }
 
+/* 每颗球落进任何槽都先带来「底弹」数量的弹药,再结算槽效果(空槽只有底弹) */
 function slotEffect(s: GameState, kind: SlotKind): void {
   const r = s.run;
-  if (kind === 'empty') r.ammo += baseAmmo(s);
-  else if (kind === 'mul') { r.ammo *= 1 + mulM(s) * Math.pow(T.mulDecay, r.multK - 1); r.multK++; }
-  else doFire(s);
+  r.ammo += baseAmmo(s);
+  if (kind === 'mul') { r.ammo *= 1 + mulM(s) * Math.pow(T.mulDecay, r.multK - 1); r.multK++; }
+  else if (kind === 'fire') doFire(s);
 }
 
 /* 发射:min(弹药, 发射上限) 进入待发;超出部分留作下一轮起始弹药(最多等于上限) */
