@@ -24,7 +24,8 @@ export const T = {
   g: 4,                        // 每推进一区格子血量 ×g(跨维度连续:2-1 接着 1 维 boss 之后继续涨)
   dimExtra: 1,                 // 每升一维额外再 ×此值
   bossCellMul: 5,              // boss 区格子血量倍率
-  bossHpRatio: 0.5,            // boss 本体血量 = boss 区格子总血量 × 此值
+  bossHpRatio: 2,              // boss 本体血量 = boss 区格子总血量 × 此值 × bossHpDimMul^(维度−1)
+  bossHpDimMul: 1.1,           // boss 本体血量每维额外倍率(破盾后靠回血再卡一下,越往后越硬)
   bossShieldRatio: 0.1,        // boss 区敌格占比 ≤ 此值时护盾破除
   bossRegen: 0.02,             // boss 每秒回复最大血量的比例
   bossCircleHit: 0,            // 0 = 普通 boss:弹珠打到 boss 区末端墙就算命中;1 = 圆形碰撞(以后做成特殊 boss 的特性)
@@ -103,6 +104,7 @@ export const TUNABLE: [keyof Tuning, string][] = [
   ['bossSalvoCap', 'boss 齐射上限(颗)'],
   ['bossCircleHit', 'boss 圆形碰撞(0 整面墙 / 1 圆形)'],
   ['bossRegen', 'boss 每秒回血比例'],
+  ['bossHpDimMul', 'boss 血量每维额外倍率'],
   ['dmgMul', '伤害每级倍率'],
   ['dmgCostMul', '伤害价格每级倍率'],
   ['capBase', '发射上限初始值'],

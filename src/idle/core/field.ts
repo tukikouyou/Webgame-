@@ -34,7 +34,7 @@ function ensureBoss(s: GameState): void {
 
 /* boss 站在 boss 区最右端的墙上(col 记为 boss 区最后一列),区内每一格都打得到 */
 function spawnBoss(s: GameState, dim: number, regionStart: number): void {
-  const hpMax = T.bossHpRatio * T.regionCols * T.rows * cellHp(regionStart);
+  const hpMax = T.bossHpRatio * T.regionCols * T.rows * cellHp(regionStart) * Math.pow(T.bossHpDimMul, dim - 1);
   s.run.boss = {
     dim, col: regionStart + T.regionCols - 1, row: Math.floor(T.rows / 2),
     hp: hpMax, hpMax, shieldBroken: false, alive: true, p: 0, fireAcc: 0, bestP: 0, bestHp: 1,
