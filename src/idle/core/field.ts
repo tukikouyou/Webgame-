@@ -15,14 +15,21 @@ export function genEnd(s: GameState): number { return s.run.colBase + s.run.cols
 
 export function ensureColumns(s: GameState): void {
   const r = s.run;
+  ensureBoss(s);
   const target = Math.min(r.front + T.lookahead, r.fieldEnd);
   while (genEnd(s) < target) {
     const c = genEnd(s);
     const hp = cellHp(c);
     r.cols.push({ o: new Array(T.rows).fill(1), hp: new Array(T.rows).fill(hp) });
-    const info = colInfo(c);
-    if (info.isBoss && c === info.regionStart && (!r.boss || r.boss.dim !== info.dim)) spawnBoss(s, info.dim, info.regionStart);
   }
+}
+
+/* 每一维开局就有 boss(位于当前维 boss 区),它负责发射全部敌方弹珠 */
+function ensureBoss(s: GameState): void {
+  const r = s.run;
+  if (r.boss) return;
+  const dim = Math.round(r.fieldEnd / colsPerDim());
+  spawnBoss(s, dim, (dim - 1) * colsPerDim() + T.regionsPerDim * T.regionCols);
 }
 
 function spawnBoss(s: GameState, dim: number, regionStart: number): void {
@@ -96,7 +103,7 @@ export function bossRegionStart(s: GameState): number {
   return b ? colInfo(b.col).regionStart : Infinity;
 }
 
-export function updateBoss(s: GameState, h: number, spawnEnemy: (x: number, y: number, dmg: number) => void): void {
+export function updateBoss(s: GameState, h: number, spawnEnemy: (x: number, y: number) => void): void {
   const r = s.run;
   const b = r.boss;
   if (!b || !b.alive) return;
@@ -121,12 +128,13 @@ export function updateBoss(s: GameState, h: number, spawnEnemy: (x: number, y: n
     b.shieldBroken = true;
     toast(s, '🛡 boss 护盾破除!', '#ffffff');
   }
-  if (r.front >= start - 30) {
-    b.fireAcc += T.bossFire * h;
-    while (b.fireAcc >= 1) {
-      b.fireAcc -= 1;
-      spawnEnemy((b.col + 0.5) * T.cellPx, (b.row + 0.5) * T.cellPx, cellHp(b.col) * T.enemyDmgMul);
-    }
+  // 从每一维开局就开火,发射数随前线所在的区递增;前线进入 boss 区后用 boss 区火力
+  const region = colInfo(Math.min(r.front, r.fieldEnd - 1)).region;
+  const rate = r.front >= start ? T.bossFire : T.bossFireBase + T.bossFireStep * (region - 1);
+  b.fireAcc += rate * h;
+  while (b.fireAcc >= 1) {
+    b.fireAcc -= 1;
+    spawnEnemy((b.col + 0.5) * T.cellPx, (b.row + 0.5) * T.cellPx);
   }
 }
 

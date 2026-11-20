@@ -26,10 +26,11 @@ export const T = {
   bossHpRatio: 0.5,            // boss 本体血量 = boss 区格子总血量 × 此值
   bossShieldRatio: 0.1,        // boss 区敌格占比 ≤ 此值时护盾破除
   bossRegen: 0.02,             // boss 每秒回复最大血量的比例
-  pushNormal: 0.3,             // 普通区敌方反推弹珠/秒
-  pushBoss: 5,                 // boss 区敌方反推弹珠/秒
-  bossFire: 2,                 // boss 本体弹珠/秒
-  enemyDmgMul: 1,              // 敌方弹珠伤害 = 所在列格子血量 × 此值
+  // 敌方弹珠全部由 boss 发射,每一维开局就开火
+  bossFireBase: 0.5,           // 前线在第 1 区时 boss 每秒发射数
+  bossFireStep: 0.5,           // 前线每推进一个普通区,每秒多发这么多
+  bossFire: 7,                 // 前线进入 boss 区后 boss 每秒发射数
+  enemyDmgMul: 1,              // 敌方弹珠威力 = 所在区格子满血 × 此值(飞进哪个区就按哪个区算)
   enemySpeed: 150, enemyCap: 300,
 
   // ---- 我方弹珠 ----
@@ -81,9 +82,9 @@ export const TUNABLE: [keyof Tuning, string][] = [
   ['dimExtra', '每维额外血量倍率'],
   ['bossCellMul', 'boss 区格子倍率'],
   ['bossHpRatio', 'boss 本体血量比例'],
-  ['pushNormal', '普通区反推(弹珠/秒)'],
-  ['pushBoss', 'boss 区反推(弹珠/秒)'],
-  ['bossFire', 'boss 开火(弹珠/秒)'],
+  ['bossFireBase', 'boss 第 1 区发射(颗/秒)'],
+  ['bossFireStep', 'boss 每区多发(颗/秒)'],
+  ['bossFire', 'boss 区发射(颗/秒)'],
   ['bossRegen', 'boss 每秒回血比例'],
   ['dmgMul', '伤害每级倍率'],
   ['dmgCostMul', '伤害价格每级倍率'],

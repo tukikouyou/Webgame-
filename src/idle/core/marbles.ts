@@ -2,7 +2,7 @@
    坐标是战场世界坐标:x = 列号 × cellPx,y ∈ [0, rows × cellPx)。 */
 import { T } from '../config/tuning';
 import type { GameState } from './types';
-import { getCol, genEnd, capture, damageBoss, bossRegionStart } from './field';
+import { getCol, genEnd, capture, damageBoss } from './field';
 import { cellHp } from './grid';
 import { dmgValue, salvoMul } from './economy';
 import { spark } from './fx';
@@ -101,30 +101,20 @@ export function updateMarbles(s: GameState, h: number): void {
   s.marbles = out;
 }
 
-/* ---- 敌方反推 ---- */
-export function spawnEnemy(s: GameState, x: number, y: number, dmg: number): void {
+/* ---- 敌方弹珠(全部由 boss 发射) ----
+   power 以「所在区一格满血」为单位:飞进哪个区,实际伤害就按那个区的格子血量换算 */
+export function spawnEnemy(s: GameState, x: number, y: number): void {
   if (s.enemies.length >= T.enemyCap) return;
   const a = Math.PI + s.rng.range(-0.5, 0.5);
   const sp = T.enemySpeed * s.rng.range(0.85, 1.15);
-  s.enemies.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, dmg });
+  s.enemies.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, power: T.enemyDmgMul });
 }
 
 export function updateEnemies(s: GameState, h: number): void {
   const r = s.run;
-  const end = genEnd(s);
   const H = fieldHeightPx();
-  const b = r.boss;
-  const inBoss = !!b && b.alive && r.front >= bossRegionStart(s);
-  r.pushAcc += (inBoss ? T.pushBoss : T.pushNormal) * h;
-  while (r.pushAcc >= 1) {
-    r.pushAcc -= 1;
-    const sc = Math.min(r.front + 30, end - 1);
-    if (sc < r.front) break;
-    spawnEnemy(s, (sc + 0.5) * T.cellPx, s.rng.range(MR, H - MR), cellHp(sc) * T.enemyDmgMul);
-  }
-
   const leftKill = r.colBase * T.cellPx;
-  const rightKill = end * T.cellPx + 40;
+  const rightKill = r.fieldEnd * T.cellPx + 40;
   const out = [];
   for (const e of s.enemies) {
     const px = e.x, py = e.y;
@@ -145,25 +135,27 @@ export function updateEnemies(s: GameState, h: number): void {
       lci = ci; lcj = cj;
       const col = getCol(s, ci);
       if (!col) continue;
+      const unit = cellHp(ci);
+      const avail = e.power * unit;
       if (col.o[cj] !== 0) {
-        // 穿过被我方打残的己方格子:先把它补满,补多少就从这颗弹珠的伤害里扣多少
-        const missing = cellHp(ci) - col.hp[cj];
+        // 穿过被我方打残的己方格子:先把它补满,补多少就从这颗弹珠的威力里扣多少
+        const missing = unit - col.hp[cj];
         if (missing > 0) {
-          const heal = Math.min(missing, e.dmg);
+          const heal = Math.min(missing, avail);
           col.hp[cj] += heal;
-          e.dmg -= heal;
-          if (e.dmg <= 0) { dead = true; break; }
+          e.power -= heal / unit;
+          if (e.power <= 1e-9) { dead = true; break; }
         }
         continue;
       }
       const hp = col.hp[cj];
-      if (e.dmg >= hp) {
-        e.dmg -= hp;
+      if (avail >= hp) {
+        e.power -= hp / unit;
         col.o[cj] = 1;
-        col.hp[cj] = cellHp(ci);
-        if (e.dmg <= 0) { dead = true; break; }
+        col.hp[cj] = unit;
+        if (e.power <= 1e-9) { dead = true; break; }
       } else {
-        col.hp[cj] -= e.dmg;
+        col.hp[cj] -= avail;
         dead = true;
         break;
       }

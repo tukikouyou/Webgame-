@@ -20,7 +20,7 @@ export function step(s: GameState, h: number): void {
   emitMarbles(s, h);
   updateMarbles(s, h);
   updateEnemies(s, h);
-  updateBoss(s, h, (x, y, dmg) => spawnEnemy(s, x, y, dmg));
+  updateBoss(s, h, (x, y) => spawnEnemy(s, x, y));
   updateFront(s, h);
   ensureColumns(s);
 

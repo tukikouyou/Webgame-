@@ -32,7 +32,6 @@ export interface RunState {
   fieldEnd: number;                     // 尚未击败的 boss 区末尾,之后的列不存在
   boss: Boss | null;
   clearedValue: number; awardedRegion: number;   // 转生能量累计
-  pushAcc: number;
   frontSpeed: number; speedAcc: number; speedPrevFront: number;
 }
 
@@ -69,7 +68,7 @@ export interface Settings {
 
 export interface Ball { x: number; y: number; vx: number; vy: number; lastPeg: number; }
 export interface Marble { x: number; y: number; vx: number; vy: number; v: number; dmg: number; life: number; }
-export interface EnemyMarble { x: number; y: number; vx: number; vy: number; dmg: number; }
+export interface EnemyMarble { x: number; y: number; vx: number; vy: number; power: number; }   // power:以所在区一格满血为单位的剩余威力
 export interface Toast { text: string; color: string; t: number; }
 export interface Spark { x: number; y: number; t: number; color: string; }
 

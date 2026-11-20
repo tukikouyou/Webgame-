@@ -18,7 +18,6 @@ export function freshRun(): RunState {
     fieldEnd: colsPerDim(),
     boss: null,
     clearedValue: 0, awardedRegion: 0,
-    pushAcc: 0,
     frontSpeed: 0, speedAcc: 0, speedPrevFront: 0,
   };
 }
