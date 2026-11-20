@@ -96,5 +96,6 @@ export interface GameState {
   bigFlash: { text: string; t: number } | null;
   lastSalvo: { amount: number; t: number } | null;
   incomeAcc: number; incomePerSec: number; autoAcc: number;
+  plinkoAcc: number;    // 我方钉板倍速推进的累计
   history: RunRecord[];
 }

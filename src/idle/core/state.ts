@@ -74,6 +74,7 @@ export function createState(seed: number): GameState {
     bigFlash: null,
     lastSalvo: null,
     incomeAcc: 0, incomePerSec: 0, autoAcc: 0,
+    plinkoAcc: 0,
     history: [],
   };
 }

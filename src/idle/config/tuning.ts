@@ -54,6 +54,7 @@ export const T = {
 
   // ---- 钉板 / 弹药 ----
   initBalls: 2, slotUnits: 12, startMul: 2, startFire: 2,
+  plinkoSpeed: 3,              // 我方钉板的下落倍速(boss 钉板不受影响)
   mulDecay: 0.7,               // 第 k 次倍增 = 1 + m × mulDecay^(k−1)
   pegSlots: 8,                 // 特殊钉位数量
   pegYield0: 25, pegYieldMul: 1.6,   // 特殊钉每次被撞:弹药 + pegYield0 × pegYieldMul^(等级−1)
@@ -114,6 +115,7 @@ export const TUNABLE: [keyof Tuning, string][] = [
   ['capBase', '发射上限初始值'],
   ['capMul', '发射上限每级倍率'],
   ['baseAmmo0', '底弹初始值'],
+  ['plinkoSpeed', '我方钉板倍速'],
   ['mulDecay', '倍增递减系数'],
   ['pegYield0', '钉子基础弹药'],
   ['pegYieldMul', '钉子每级弹药倍率'],

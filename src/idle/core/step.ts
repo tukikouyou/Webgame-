@@ -15,7 +15,9 @@ export function step(s: GameState, h: number): void {
   r.time += h;
   ensureColumns(s);
 
-  updatePlinko(s, h);
+  // 我方钉板按 plinkoSpeed 倍速推进(分成多个小步,速度快了也不会穿钉)
+  s.plinkoAcc += T.plinkoSpeed;
+  while (s.plinkoAcc >= 1) { s.plinkoAcc -= 1; updatePlinko(s, h); }
   updateBossBoard(s, h);
 
   emitMarbles(s, h);
