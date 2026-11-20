@@ -17,8 +17,11 @@ export function rebirthGain(s: GameState): number {
 
 export function canRebirth(s: GameState): boolean { return rebirthGain(s) >= 1; }
 
+/* 当前这一轮推到的维度与区号 */
+export function frontInfo(s: GameState) { return colInfo(Math.min(s.run.front, s.run.fieldEnd - 1)); }
+
 export function frontLabel(s: GameState): string {
-  const info = colInfo(Math.min(s.run.front, s.run.fieldEnd - 1));
+  const info = frontInfo(s);
   return regionLabel(info.dim, info.region);
 }
 
@@ -34,12 +37,12 @@ export function doRebirth(s: GameState): void {
   toast(s, '转生!获得 ' + gain + ' 维度能量', '#7fd0ff');
 }
 
-/* ---- 终结纪元 ---- */
-export function canEndEpoch(s: GameState): boolean { return s.epoch.maxDim >= T.epochDim; }
+/* ---- 终结纪元:条件和星砂都按当前这一轮推到的位置算 ---- */
+export function canEndEpoch(s: GameState): boolean { return frontInfo(s).dim >= T.epochDim; }
 
 export function sandGain(s: GameState): number {
-  const e = s.epoch;
-  return Math.floor(T.sandBase * Math.pow(T.sandDimMul, e.maxDim - T.epochDim) * (1 + 0.25 * (e.maxRegionAtMax - 1)));
+  const i = frontInfo(s);
+  return Math.floor(T.sandBase * Math.pow(T.sandDimMul, i.dim - T.epochDim) * (1 + 0.25 * (i.region - 1)));
 }
 
 export function doEndEpoch(s: GameState): void {

@@ -29,7 +29,7 @@ export function freshEpoch(legacy: LegacyState): EpochState {
     pegs: [],
     funcUnlocked: T.startMul + T.startFire,
     mulAlloc: T.startMul,
-    maxDim: 1, maxRegionAtMax: 1,
+    maxDim: 1,
     runs: 0,
   };
   if (legacy.talents.startPegs) {
@@ -62,7 +62,7 @@ export function createState(seed: number): GameState {
     epoch: freshEpoch(legacy),
     cycle: freshCycle(),
     legacy,
-    settings: { autoUp: true, autoRebirth: false },
+    settings: { autoUp: true, autoRebirth: false, autoSkip: { dmg: false, cap: false, base: false } },
     balls: [],
     marbles: [],
     enemies: [],

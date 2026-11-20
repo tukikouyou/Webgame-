@@ -43,7 +43,7 @@ export interface EpochState {
   pegs: OwnedPeg[];
   funcUnlocked: number;     // 用能量解锁的功能格数
   mulAlloc: number;         // 其中分给倍增的格数(其余为发射)
-  maxDim: number; maxRegionAtMax: number;
+  maxDim: number;           // 本纪元到过的最高维度(传承条件用)
   runs: number;
 }
 
@@ -62,7 +62,10 @@ export interface LegacyState {
   everDim: number;          // 历史最高维度(解锁自动化用)
 }
 
-export interface Settings { autoUp: boolean; autoRebirth: boolean; }
+export interface Settings {
+  autoUp: boolean; autoRebirth: boolean;
+  autoSkip: Record<UpKind, boolean>;   // 自动升级跳过的项目
+}
 
 export interface Ball { x: number; y: number; vx: number; vy: number; lastPeg: number; }
 export interface Marble { x: number; y: number; vx: number; vy: number; v: number; dmg: number; life: number; }

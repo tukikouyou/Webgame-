@@ -25,6 +25,7 @@ export function loadGame(s: GameState): boolean {
     Object.assign(s.legacy, d.legacy);
     s.legacy.talents = { ...s.legacy.talents, ...d.legacy?.talents };
     Object.assign(s.settings, d.settings);
+    s.settings.autoSkip = { dmg: false, cap: false, base: false, ...d.settings?.autoSkip };
     s.history = Array.isArray(d.history) ? d.history : [];
     return true;
   } catch { return false; }

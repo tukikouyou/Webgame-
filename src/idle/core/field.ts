@@ -58,10 +58,6 @@ export function updateFront(s: GameState, h: number): void {
   awardRegions(s);
   consolidate(s);
 
-  const info = colInfo(Math.min(f, r.fieldEnd - 1));
-  const e = s.epoch;
-  if (info.dim === e.maxDim && info.region > e.maxRegionAtMax) e.maxRegionAtMax = info.region;
-
   // 前线速度(列/分钟),每 2 秒采样一次
   r.speedAcc += h;
   if (r.speedAcc >= 2) {
@@ -156,7 +152,7 @@ function killBoss(s: GameState): void {
   r.boss = null;
   s.marbles = [];          // 打过 boss 清场
   s.enemies = [];
-  if (nd > s.epoch.maxDim) { s.epoch.maxDim = nd; s.epoch.maxRegionAtMax = 1; }
+  if (nd > s.epoch.maxDim) s.epoch.maxDim = nd;
   if (nd > s.legacy.everDim) s.legacy.everDim = nd;
   bigFlash(s, '升维 → ' + nd + ' 维');
   toast(s, '击败 ' + b.dim + ' 维 boss!进入 ' + nd + ' 维', '#ffffff');

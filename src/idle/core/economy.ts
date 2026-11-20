@@ -37,11 +37,12 @@ export function buyUp(s: GameState, kind: UpKind): boolean {
   return true;
 }
 
-/* 自动升级:反复买「买得起的最便宜项目」 */
+/* 自动升级:反复买「买得起的最便宜项目」,跳过玩家关掉的项目 */
 export function autoBuy(s: GameState): void {
   for (let n = 0; n < 60; n++) {
     let best: UpKind | null = null, bestCost = Infinity;
     for (const k of UP_KINDS) {
+      if (s.settings.autoSkip[k]) continue;
       const c = upCost(k, s.run.up[k]);
       if (c < bestCost) { bestCost = c; best = k; }
     }

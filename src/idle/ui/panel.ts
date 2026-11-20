@@ -11,7 +11,7 @@ import {
 import { PEG_COLORS, PEG_COLOR_NAMES } from '../core/plinko';
 import { CARDS, cardDef, cardPool, packCost, openPack, pickCard } from '../core/cards';
 import {
-  rebirthGain, canRebirth, doRebirth, canEndEpoch, sandGain, doEndEpoch,
+  rebirthGain, canRebirth, doRebirth, canEndEpoch, sandGain, doEndEpoch, frontLabel,
   canLegacy, legacyGain, doLegacy, TALENTS, talentCost, buyTalent,
 } from '../core/prestige';
 import { autoUnlocked } from '../core/step';
@@ -53,11 +53,13 @@ export function initPanel(app: PanelApp): void {
       const cost = upCost(k, lv);
       const cur = k === 'dmg' ? dmgValue(s) : k === 'cap' ? capValue(s) : baseAmmo(s);
       const next = k === 'dmg' ? cur * T.dmgMul : k === 'cap' ? cur * T.capMul : cur * T.baseAmmoMul;
+      const skip = s.settings.autoSkip[k];
+      const autoCell = autoUnlocked(s) ? '<td>' + btn('skip:' + k, skip ? '自动:跳过' : '自动:购买', true, skip ? '' : 'on') + '</td>' : '';
       return '<tr><td>' + UP_NAMES[k] + '</td><td>Lv ' + lv + '</td><td>' + fmt(cur) + ' → ' + fmt(next) + '</td><td>'
-        + btn('up:' + k, '升级 ' + fmt(cost) + ' 金币', s.run.coins >= cost) + '</td></tr>';
+        + btn('up:' + k, '升级 ' + fmt(cost) + ' 金币', s.run.coins >= cost) + '</td>' + autoCell + '</tr>';
     }).join('');
     const auto = autoUnlocked(s)
-      ? btn('toggle:autoUp', '自动升级:' + (s.settings.autoUp ? '开' : '关'), true, s.settings.autoUp ? 'on' : '') + ' <span class="dim">买得起的最便宜项目</span>'
+      ? btn('toggle:autoUp', '自动升级:' + (s.settings.autoUp ? '开' : '关'), true, s.settings.autoUp ? 'on' : '') + ' <span class="dim">按最便宜的顺序买;每项右边的开关可以让自动升级跳过它</span>'
       : '<span class="dim">自动升级:到达 ' + T.autoUnlockDim + ' 维后解锁</span>';
     return '<p class="dim">金币来自占领格子(格子血量 × 奖励倍率)和己方格子的持续产出;转生后清零。</p>'
       + '<table class="tbl">' + rows + '</table><div class="row">' + auto + '</div>'
@@ -103,9 +105,9 @@ export function initPanel(app: PanelApp): void {
   }
 
   function epochTab(s: GameState): string {
-    let h = '<div class="row big">本纪元最高 <b>' + s.epoch.maxDim + ' 维</b>(需 ' + T.epochDim + ' 维) '
+    let h = '<div class="row big">本轮已推到 <b>' + frontLabel(s) + '</b>(本轮需到 ' + T.epochDim + ' 维) '
       + btn('endEpoch', canEndEpoch(s) ? '终结纪元 → +' + fmt(sandGain(s)) + ' 星砂' : '终结纪元(未达成)', canEndEpoch(s), 'warn') + '</div>';
-    h += '<p class="dim">终结纪元会重置维度能量、钉子、槽宽和推进进度;保留卡牌、星砂和传承。推得越深星砂越多。</p>';
+    h += '<p class="dim">终结纪元会重置维度能量、钉子、槽宽和推进进度;保留卡牌、星砂和传承。条件和星砂都按<b>当前这一轮</b>推到的位置算,本轮推得越深星砂越多。</p>';
     h += '<div class="row big">星砂 <b class="cS">' + fmt(s.cycle.sand) + '</b> '
       + btn('pack', '开卡包(三选一)' + fmt(packCost(s)) + ' 星砂', s.cycle.sand >= packCost(s) && !s.cycle.pendingPick) + '</div>';
     h += '<h4>已有卡牌(重复抽到叠加层数)</h4><div class="cards">';
@@ -176,6 +178,7 @@ export function initPanel(app: PanelApp): void {
     switch (name) {
       case 'pause': app.paused = !app.paused; break;
       case 'toggle': { const st = s.settings as unknown as Record<string, boolean>; st[arg] = !st[arg]; break; }
+      case 'skip': s.settings.autoSkip[arg as UpKind] = !s.settings.autoSkip[arg as UpKind]; break;
       case 'up': buyUp(s, arg as UpKind); break;
       case 'rebirth': doRebirth(s); break;
       case 'pegBuy': buyPeg(s, +arg, pegColor); break;
