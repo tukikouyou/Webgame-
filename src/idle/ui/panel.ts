@@ -36,9 +36,18 @@ export function initPanel(app: PanelApp): void {
   let tab: Tab = 'cannon';
   let pegColor = 0;
   let pickKey = '';
+  // 重置类操作的二次确认(内置预览浏览器会拦截 confirm 弹窗):第一次点击进入待确认,4 秒内再点才执行
+  const CONFIRM_ACTS = new Set(['endEpoch', 'legacy', 'reset']);
+  let armed = '';
+  let armedUntil = 0;
+  const isArmed = (act: string) => armed === act && performance.now() < armedUntil;
 
-  const btn = (act: string, label: string, enabled = true, cls = '') =>
-    '<button data-act="' + act + '"' + (enabled ? '' : ' disabled') + (cls ? ' class="' + cls + '"' : '') + '>' + label + '</button>';
+  const btn = (act: string, label: string, enabled = true, cls = '') => {
+    const on = isArmed(act);
+    const c = on ? 'danger' : cls;
+    return '<button data-act="' + act + '"' + (enabled ? '' : ' disabled') + (c ? ' class="' + c + '"' : '') + '>'
+      + (on ? '再点一次确认 · ' + label : label) + '</button>';
+  };
 
   function renderTabs(): void {
     tabsEl.innerHTML = TABS.map(([k, n]) => '<button data-tab="' + k + '" class="' + (k === tab ? 'active' : '') + '">' + n + '</button>').join('');
@@ -175,6 +184,16 @@ export function initPanel(app: PanelApp): void {
   function act(a: string): void {
     const s = app.state;
     const [name, arg] = a.split(':');
+    if (CONFIRM_ACTS.has(name)) {
+      if (!isArmed(a)) {
+        armed = a;
+        armedUntil = performance.now() + 4000;
+        if (tab === 'debug') bodyEl.innerHTML = debugTab();
+        renderBody();
+        return;
+      }
+      armed = '';
+    }
     switch (name) {
       case 'pause': app.paused = !app.paused; break;
       case 'toggle': { const st = s.settings as unknown as Record<string, boolean>; st[arg] = !st[arg]; break; }
@@ -185,9 +204,9 @@ export function initPanel(app: PanelApp): void {
       case 'pegUp': upgradePeg(s, +arg); break;
       case 'width': buyWidth(s); break;
       case 'mul': setMulAlloc(s, s.epoch.mulAlloc + +arg); break;
-      case 'endEpoch': if (confirm('终结纪元?将重置能量、钉子、槽宽和推进进度。')) doEndEpoch(s); break;
+      case 'endEpoch': doEndEpoch(s); break;
       case 'pack': openPack(s); break;
-      case 'legacy': if (confirm('进行传承?将重置卡牌、星砂和以下所有层。')) doLegacy(s); break;
+      case 'legacy': doLegacy(s); break;
       case 'talent': buyTalent(s, arg as 'vault' | 'res' | 'coin' | 'startPegs'); break;
       case 'add':
         if (arg === 'coins') s.run.coins = s.run.coins * 10 + 1000;
@@ -195,10 +214,11 @@ export function initPanel(app: PanelApp): void {
         if (arg === 'sand') s.cycle.sand += 100;
         if (arg === 'legacy') s.legacy.points += 5;
         break;
-      case 'reset': if (confirm('确定重置全部存档?')) app.resetAll(); break;
+      case 'reset': app.resetAll(); break;
     }
     app.save();
     renderTabs();
+    if (tab === 'debug') bodyEl.innerHTML = debugTab();
     renderBody();
     renderPick();
   }
