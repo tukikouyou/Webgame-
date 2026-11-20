@@ -65,7 +65,9 @@ export const T = {
   autoUnlockDim: 2,            // 到达几维解锁自动升级/自动转生
 
   // ---- 纪元 / 传承 ----
-  epochDim: 5, sandBase: 20, sandDimMul: 1.6,
+  epochDim: 5,
+  sandPerDim: 2.5,             // 终结纪元:本轮过第 1 维得多少星砂
+  sandDimGrow: 1.5,            // 之后每过一维,这一维的星砂 ×此值(累加)
   packCost0: 10, packCostMul: 1.25,
   legacyDim: 10,
 };
@@ -95,5 +97,7 @@ export const TUNABLE: [keyof Tuning, string][] = [
   ['energyRegionMul', '能量每区倍率'],
   ['autoRebirthSec', '自动转生秒数'],
   ['epochDim', '终结纪元所需维度'],
+  ['sandPerDim', '第 1 维星砂'],
+  ['sandDimGrow', '每维星砂增长倍率'],
   ['legacyDim', '传承所需维度'],
 ];

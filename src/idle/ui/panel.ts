@@ -107,7 +107,7 @@ export function initPanel(app: PanelApp): void {
   function epochTab(s: GameState): string {
     let h = '<div class="row big">本轮已推到 <b>' + frontLabel(s) + '</b>(本轮需到 ' + T.epochDim + ' 维) '
       + btn('endEpoch', canEndEpoch(s) ? '终结纪元 → +' + fmt(sandGain(s)) + ' 星砂' : '终结纪元(未达成)', canEndEpoch(s), 'warn') + '</div>';
-    h += '<p class="dim">终结纪元会重置维度能量、钉子、槽宽和推进进度;保留卡牌、星砂和传承。条件和星砂都按<b>当前这一轮</b>推到的位置算,本轮推得越深星砂越多。</p>';
+    h += '<p class="dim">终结纪元会重置维度能量、钉子、槽宽和推进进度;保留卡牌、星砂和传承。条件和星砂都按<b>当前这一轮</b>算:过第 1 维得 ' + T.sandPerDim + ',之后每一维比上一维多 ×' + T.sandDimGrow + ',全部累加。</p>';
     h += '<div class="row big">星砂 <b class="cS">' + fmt(s.cycle.sand) + '</b> '
       + btn('pack', '开卡包(三选一)' + fmt(packCost(s)) + ' 星砂', s.cycle.sand >= packCost(s) && !s.cycle.pendingPick) + '</div>';
     h += '<h4>已有卡牌(重复抽到叠加层数)</h4><div class="cards">';

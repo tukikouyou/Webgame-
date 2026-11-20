@@ -40,9 +40,12 @@ export function doRebirth(s: GameState): void {
 /* ---- 终结纪元:条件和星砂都按当前这一轮推到的位置算 ---- */
 export function canEndEpoch(s: GameState): boolean { return frontInfo(s).dim >= T.epochDim; }
 
+/* 星砂:本轮过第 k 维得 sandPerDim × sandDimGrow^(k−1),全部累加(在 5 维时已过 4 维) */
 export function sandGain(s: GameState): number {
-  const i = frontInfo(s);
-  return Math.floor(T.sandBase * Math.pow(T.sandDimMul, i.dim - T.epochDim) * (1 + 0.25 * (i.region - 1)));
+  const passed = frontInfo(s).dim - 1;
+  const r = T.sandDimGrow;
+  const sum = r === 1 ? passed : (Math.pow(r, passed) - 1) / (r - 1);
+  return Math.floor(T.sandPerDim * sum);
 }
 
 export function doEndEpoch(s: GameState): void {

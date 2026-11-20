@@ -145,7 +145,18 @@ export function updateEnemies(s: GameState, h: number): void {
       if (ci === lci && cj === lcj) continue;
       lci = ci; lcj = cj;
       const col = getCol(s, ci);
-      if (!col || col.o[cj] !== 0) continue;
+      if (!col) continue;
+      if (col.o[cj] !== 0) {
+        // 穿过被我方打残的己方格子:先把它补满,补多少就从这颗弹珠的伤害里扣多少
+        const missing = cellHp(ci) - col.hp[cj];
+        if (missing > 0) {
+          const heal = Math.min(missing, e.dmg);
+          col.hp[cj] += heal;
+          e.dmg -= heal;
+          if (e.dmg <= 0) { dead = true; break; }
+        }
+        continue;
+      }
       const hp = col.hp[cj];
       if (e.dmg >= hp) {
         e.dmg -= hp;
