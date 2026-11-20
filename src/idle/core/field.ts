@@ -39,6 +39,7 @@ function spawnBoss(s: GameState, dim: number, regionStart: number): void {
     dim, col: regionStart + T.regionCols - 1, row: Math.floor(T.rows / 2),
     hp: hpMax, hpMax, shieldBroken: false, alive: true, p: 0, fireAcc: 0, bestP: 0, bestHp: 1,
     board: dim >= T.bossBoardDim, bAmmo: 0, bMultK: 1, bQueue: 0, bEmitAcc: 0,
+    circle: T.bossCircleHit >= 1,
   };
 }
 

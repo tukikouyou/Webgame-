@@ -84,10 +84,11 @@ export function updateMarbles(s: GameState, h: number): void {
       }
     }
 
-    // boss 在 boss 区右端的墙上:只有飞到墙、且正好在 boss 那几行的弹珠才打中 boss(或被护盾挡下)
+    // boss 在 boss 区右端的墙上:普通 boss 整面墙都算命中(或被护盾挡下);
+    // 圆形碰撞的 boss 只有飞到墙且正好在 boss 那几行的弹珠才算
     if (!dead && atWall) {
       const hitBand = b && b.alive && rightWall >= r.fieldEnd * T.cellPx
-        && Math.abs(m.y - bossY(b)) < (b.shieldBroken ? BOSS_R : SHIELD_R);
+        && (!b.circle || Math.abs(m.y - bossY(b)) < (b.shieldBroken ? BOSS_R : SHIELD_R));
       if (hitBand && b) {
         dead = true; spark(s, m.x, m.y, '#ffffff');
         if (b.shieldBroken) {

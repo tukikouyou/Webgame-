@@ -27,6 +27,7 @@ export const T = {
   bossHpRatio: 0.5,            // boss 本体血量 = boss 区格子总血量 × 此值
   bossShieldRatio: 0.1,        // boss 区敌格占比 ≤ 此值时护盾破除
   bossRegen: 0.02,             // boss 每秒回复最大血量的比例
+  bossCircleHit: 0,            // 0 = 普通 boss:弹珠打到 boss 区末端墙就算命中;1 = 圆形碰撞(以后做成特殊 boss 的特性)
   // 敌方弹珠全部由 boss 发射,每一维开局就开火
   bossFireBase: 1,             // 前线在第 1 区时 boss 每秒发射数
   bossFireStep: 1.5,           // 前线每推进一个普通区,每秒多发这么多(1 → 2.5 → 4 → boss 区 7)
@@ -56,7 +57,8 @@ export const T = {
 
   // ---- 炮台升级(金币) ----
   dmgMul: 1.09, dmgCost0: 10, dmgCostMul: 1.15,
-  capBase: 100, capMul: 1.6, capCost0: 50, capCostMul: 1.4,
+  // 发射上限每维约 ×5,与实际齐射弹药保持同一量级(金币每维 ×256,所以价格倍率要远大于上限倍率)
+  capBase: 100, capMul: 1.55, capCost0: 5, capCostMul: 4.5,
   baseAmmo0: 10, baseAmmoMul: 1.1, baseAmmoCost0: 20, baseAmmoCostMul: 1.6,
 
   // ---- 金币 ----
@@ -99,6 +101,7 @@ export const TUNABLE: [keyof Tuning, string][] = [
   ['bossFullFireDim', 'boss 全程满火力起始维度'],
   ['bossBoardBalls', 'boss 钉板球数'],
   ['bossSalvoCap', 'boss 齐射上限(颗)'],
+  ['bossCircleHit', 'boss 圆形碰撞(0 整面墙 / 1 圆形)'],
   ['bossRegen', 'boss 每秒回血比例'],
   ['dmgMul', '伤害每级倍率'],
   ['dmgCostMul', '伤害价格每级倍率'],

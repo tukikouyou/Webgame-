@@ -17,6 +17,7 @@ export interface Boss {
   bestP: number; bestHp: number;   // 本轮 boss 战的最好进展(判定撞墙用)
   // boss 钉板(第 bossBoardDim 维起)
   board: boolean; bAmmo: number; bMultK: number; bQueue: number; bEmitAcc: number;
+  circle: boolean;      // 碰撞体积:false = 打到末端墙就算命中;true = 只有 boss 周围一圈(特殊 boss 特性)
 }
 
 export interface RunState {

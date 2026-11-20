@@ -304,7 +304,15 @@ function drawField(ctx: CanvasRenderingContext2D, s: GameState): void {
   const b = r.boss;
   if (b && b.alive) {
     const px = ox + bossX(b), py = oy + bossY(b);   // boss 站在 boss 区右端的墙上
-    if (!b.shieldBroken) {
+    if (!b.circle) {   // 普通 boss:整面末端墙都是命中区,画成一道墙(护盾中发光)
+      ctx.fillStyle = b.shieldBroken ? 'rgba(242,242,242,0.85)' : 'rgba(255,255,255,0.5)';
+      ctx.fillRect(px - 3, oy, 6, fh);
+      if (!b.shieldBroken) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 2;
+        ctx.strokeRect(px - 6, oy + 1, 12, fh - 2);
+        ctx.lineWidth = 1;
+      }
+    } else if (!b.shieldBroken) {
       ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 3;
       ctx.beginPath(); ctx.arc(px, py, SHIELD_R, 0, Math.PI * 2); ctx.stroke();
       ctx.lineWidth = 1;
